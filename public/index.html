@@ -159,6 +159,24 @@ setInterval(sendKeys, 1000/FPS);
 
 // ── WebSocket ──────────────────────────────────────────────────────────────────
 let ws;
+let currentRoomId = null;
+
+function updateWaitCountdown(seconds) {
+  const lobbyEl = document.getElementById('lobby-info');
+  if (!lobbyEl) return;
+  const roomTag = currentRoomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${currentRoomId}</span><br>` : '';
+  if (seconds <= 0) {
+    lobbyEl.innerHTML = roomTag + `<b style="color:var(--gold)">⚡ GAME STARTING…</b>`;
+    return;
+  }
+  const bar = Math.round((seconds / 20) * 10);
+  const filled = '█'.repeat(bar) + '░'.repeat(10 - bar);
+  lobbyEl.innerHTML = roomTag +
+    `<b style="color:var(--gold)">⚡ STARTING IN ${seconds}s</b><br>` +
+    `<span style="color:var(--gold);letter-spacing:.05em;font-size:.8rem">${filled}</span><br>` +
+    `<span style="opacity:.55;font-size:.65rem">More players can still join!</span>`;
+}
+
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
@@ -176,6 +194,7 @@ function connect() {
       blueBase = msg.blueBase; redBase = msg.redBase;
       blueSpawns = msg.blueSpawns; redSpawns = msg.redSpawns;
       maxScore = msg.maxScore || 5;
+      if (msg.roomId) currentRoomId = msg.roomId;
       resizeCanvas();
       updateRoleBadge();
       showTeamBar();
@@ -190,14 +209,30 @@ function connect() {
 
     if (msg.type === 'lobby') {
       const need = msg.need;
+      const roomTag = msg.roomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${msg.roomId}</span><br>` : '';
       document.getElementById('lobby-info').innerHTML =
+        roomTag +
         `<span class="lb">🔵 Blue: ${msg.blue}/${need}</span> &nbsp; <span class="lr">🔴 Red: ${msg.red}/${need}</span><br>
-         <span style="opacity:.6">Game starts when both teams have at least 1 player.<br>Max ${need} per team.</span>`;
+         <span style="opacity:.6">Waiting for players on both teams…<br>Max ${need} per team.</span>`;
     }
 
-    if (msg.type === 'starting') {
-      document.getElementById('lobby-info').innerHTML =
-        `<b style="color:var(--gold)">⚡ GAME STARTING IN ${msg.countdown}…</b>`;
+    if (msg.type === 'waitStart') {
+      // 2+ players joined — 20s countdown before game starts
+      updateWaitCountdown(msg.seconds);
+    }
+
+    if (msg.type === 'waitTick') {
+      updateWaitCountdown(msg.seconds);
+    }
+
+    if (msg.type === 'waitCancelled') {
+      // A player left and we no longer have both teams
+      const lobbyEl = document.getElementById('lobby-info');
+      if (lobbyEl) {
+        const roomTag = currentRoomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${currentRoomId}</span><br>` : '';
+        lobbyEl.innerHTML = roomTag +
+          `<span style="opacity:.7">⏸ Wait cancelled — need a player on each team.</span>`;
+      }
     }
 
     if (msg.type === 'phase' && msg.phase === 'playing') {
