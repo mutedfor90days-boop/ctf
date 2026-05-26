@@ -171,7 +171,6 @@ function broadcastLobby(room) {
     red: countTeam(room, 'red'),
     need: TEAM_SIZE,
     roomId: room.id,
-    name: p.name,
   });
 }
 
