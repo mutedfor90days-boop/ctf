@@ -130,6 +130,7 @@
     <input id="nickname-input" type="text" maxlength="16" placeholder="ENTER NICKNAME" autocomplete="off" spellcheck="false" />
     <div id="nickname-error"></div>
     <button class="btn-play" onclick="startMatchmaking()">▶ QUICK PLAY</button>
+    <button class="btn-play" style="background:linear-gradient(90deg,#1a4a1a,#0a2a0a);border:1px solid #00ff88;color:#00ff88;margin-top:6px" onclick="startQuickPlayBots()">&#129302; PLAY vs BOTS</button>
 
     <div class="home-divider">OR</div>
 
@@ -450,11 +451,16 @@ function sendNickname() {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nickname', name: playerNickname }));
 }
 
-function connect(roomCode) {
+function connect(roomCode, quickPlay) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = roomCode
-    ? `${proto}://${location.host}?room=${encodeURIComponent(roomCode)}`
-    : `${proto}://${location.host}`;
+  let wsUrl;
+  if (quickPlay) {
+    wsUrl = `${proto}://${location.host}?quickplay=1`;
+  } else if (roomCode) {
+    wsUrl = `${proto}://${location.host}?room=${encodeURIComponent(roomCode)}`;
+  } else {
+    wsUrl = `${proto}://${location.host}`;
+  }
   console.log('[CTF] Connecting to:', wsUrl);
   ws = new WebSocket(wsUrl);
 
@@ -672,6 +678,19 @@ function startMatchmaking() {
   connect(codeToUse);
 }
 
+function startQuickPlayBots() {
+  const input = document.getElementById('nickname-input');
+  const errEl = document.getElementById('nickname-error');
+  const raw = (input.value || '').trim();
+  if (!raw) { errEl.textContent = 'Please enter a nickname first.'; input.focus(); return; }
+  if (raw.length < 2) { errEl.textContent = 'Too short — at least 2 characters.'; input.focus(); return; }
+  errEl.textContent = '';
+  playerNickname = raw.slice(0, 16);
+  document.getElementById('home-screen').style.display = 'none';
+  _pendingCode = null;
+  connect(null, true);
+}
+
 // Allow pressing Enter in nickname field
 document.getElementById('nickname-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') startMatchmaking();
@@ -839,7 +858,7 @@ function drawPlayer(p) {
   }
 
   // Player label / nickname
-  const label = p.name ? p.name : (isMe ? 'YOU' : 'P' + (p.slotIndex != null ? p.slotIndex + 1 : ''));
+  const label = p.isBot ? ('\u{1F916}' + (p.name||'Bot')) : (p.name ? p.name : (isMe ? 'YOU' : 'P' + (p.slotIndex != null ? p.slotIndex + 1 : '')));
   const fontSize = isMe ? 9 : 8;
   ctx.font = (isMe ? 'bold ' : '') + fontSize + 'px Share Tech Mono';
   ctx.textAlign = 'center';
