@@ -30,7 +30,7 @@
   /* minimap */
   #minimap{position:absolute;bottom:8px;right:8px;border:1px solid #1a3a5a;background:rgba(0,5,15,.85);}
   /* overlay */
-  #overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  #overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
     background:rgba(0,4,12,.93);backdrop-filter:blur(6px);}
   .obox{background:linear-gradient(135deg,#060f1c,#030810);border:1px solid #1a2a3a;
     box-shadow:0 0 60px rgba(0,200,255,.12);padding:36px 44px;text-align:center;max-width:460px;width:92vw;}
@@ -470,6 +470,8 @@ function connect(roomCode, quickPlay) {
     const msg = JSON.parse(e.data);
 
     if (msg.type === 'init') {
+      document.getElementById('home-screen').style.display = 'none';
+      document.getElementById('overlay').style.display = 'flex';
       myId = msg.playerId; myTeam = msg.team;
       W = msg.W; H = msg.H;
       walls = msg.walls;
@@ -502,7 +504,6 @@ function connect(roomCode, quickPlay) {
     }
 
     if (msg.type === 'waitStart') {
-      // countdown started — hide home screen, show overlay countdown
       document.getElementById('home-screen').style.display = 'none';
       document.getElementById('overlay').style.display = 'flex';
       updateWaitCountdown(msg.seconds);
@@ -534,6 +535,7 @@ function connect(roomCode, quickPlay) {
       document.getElementById('overlay').style.display = 'none';
       document.getElementById('home-screen').style.display = 'none';
       gamePhase = 'playing';
+      resizeCanvas();
     }
 
     if (msg.type === 'state') {
