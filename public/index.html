@@ -148,6 +148,7 @@
           <div class="code-val" id="code-val"></div>
           <div class="code-link" id="code-link"></div>
           <button class="copy-btn" onclick="copyRoomLink()">📋 COPY INVITE LINK</button>
+          <button class="copy-btn" style="color:var(--gold);border-color:var(--gold);margin-top:4px" onclick="enterOwnRoom()">▶ ENTER YOUR ROOM</button>
         </div>
       </div>
 
@@ -451,7 +452,10 @@ function sendNickname() {
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}`);
+  const wsUrl = pendingRoomCode
+    ? `${proto}://${location.host}?room=${encodeURIComponent(pendingRoomCode)}`
+    : `${proto}://${location.host}`;
+  ws = new WebSocket(wsUrl);
 
   ws.onopen = () => { console.log('Connected'); if (playerNickname) sendNickname(); };
 
@@ -582,7 +586,7 @@ async function createPrivateRoom() {
     const res = await fetch('/api/rooms/create', { method: 'POST' });
     const data = await res.json();
     privateRoomCode = data.code;
-    pendingRoomCode = data.code;
+    // Don't set pendingRoomCode here — user must explicitly click Join to enter
     const display = document.getElementById('code-display');
     display.classList.add('visible');
     document.getElementById('code-val').textContent = data.code;
@@ -591,6 +595,12 @@ async function createPrivateRoom() {
   } catch(e) {
     document.getElementById('room-error').textContent = 'Failed to create room. Try again.';
   }
+}
+
+function enterOwnRoom() {
+  if (!privateRoomCode) return;
+  pendingRoomCode = privateRoomCode;
+  startMatchmaking();
 }
 
 function copyRoomLink() {
