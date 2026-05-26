@@ -6,582 +6,836 @@
 <title>CTF — Local 2 Player</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
-  :root{--bg:#06090f;--blue:#00cfff;--red:#ff2244;--gold:#ffd700;}
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:#fff;font-family:'Share Tech Mono',monospace;
-    height:100vh;overflow:hidden;user-select:none;display:flex;flex-direction:column;}
+  :root {
+    --bg: #06090f;
+    --blue: #00cfff;
+    --red: #ff2244;
+    --gold: #ffd700;
+    --green: #00ff88;
+    --dim: #1a2a3a;
+    --panel: rgba(0,15,35,0.9);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+  header {
+    z-index: 10;
+    text-align: center;
+    padding: 10px 0 4px;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: clamp(1rem, 3.5vw, 2rem);
+    letter-spacing: 0.25em;
+    background: linear-gradient(90deg, var(--blue), #fff 50%, var(--red));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 10px rgba(0,200,255,0.35));
+  }
+  #scoreboard {
+    display: flex;
+    gap: 28px;
+    padding: 4px 0 6px;
+    flex-shrink: 0;
+  }
+  .score-block { display:flex; flex-direction:column; align-items:center; gap:1px; }
+  .score-label { opacity:0.55; font-size:0.65rem; letter-spacing:0.15em; }
+  .score-val { font-family:'Orbitron',monospace; font-size:1.2rem; font-weight:700; }
+  .blue-val { color:var(--blue); text-shadow:0 0 10px var(--blue); }
+  .red-val  { color:var(--red);  text-shadow:0 0 10px var(--red); }
+  .time-val { color:var(--gold); text-shadow:0 0 10px var(--gold); }
+  #game-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 4px 8px;
+    flex: 1;
+    min-height: 0;
+  }
+  canvas {
+    border: 1px solid #142030;
+    box-shadow: 0 0 40px rgba(0,200,255,0.1), 0 0 80px rgba(0,0,0,0.7);
+    display: block;
+    flex-shrink: 0;
+  }
+  #side-panel {
+    width: 155px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.68rem;
+    flex-shrink: 0;
+  }
+  .panel-box {
+    background: var(--panel);
+    border: 1px solid var(--dim);
+    border-left: 3px solid var(--blue);
+    padding: 9px 10px;
+    line-height: 1.75;
+  }
+  .panel-box.red-box { border-left-color: var(--red); }
+  .panel-box h3 {
+    font-family:'Orbitron',monospace;
+    font-size:0.6rem;
+    letter-spacing:0.12em;
+    margin-bottom:5px;
+    opacity:0.65;
+  }
+  .key-row { display:flex; gap:5px; align-items:center; margin:1px 0; }
+  .kbd {
+    background:#0a1825;
+    border:1px solid #1e3a5a;
+    border-radius:3px;
+    padding:1px 5px;
+    font-size:0.62rem;
+    color:var(--blue);
+    min-width:22px;
+    text-align:center;
+  }
+  .kbd.red { color:var(--red); border-color:#5a1e28; background:#180a10; }
+  .kbd.spc { color:var(--gold); border-color:#5a4a00; background:#1a1400; min-width:50px; }
 
-  #hud{display:flex;align-items:center;justify-content:space-between;
-    padding:5px 18px;flex-shrink:0;background:rgba(0,0,0,.5);border-bottom:1px solid #0a1828;position:relative;}
-  .hud-team{display:flex;align-items:center;gap:10px;font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;}
-  .hud-score{font-size:1.5rem;}
-  .hud-blue{color:var(--blue);text-shadow:0 0 10px var(--blue);}
-  .hud-red {color:var(--red); text-shadow:0 0 10px var(--red);}
-  #hud-center{display:flex;flex-direction:column;align-items:center;gap:2px;}
-  #hud-time{font-family:'Orbitron',monospace;font-size:1rem;color:var(--gold);text-shadow:0 0 10px var(--gold);letter-spacing:.1em;}
-  #hud-flash{font-size:.58rem;letter-spacing:.08em;opacity:.9;min-height:1em;color:#fff;text-align:center;}
+  /* OVERLAY */
+  #overlay {
+    position:fixed; inset:0; z-index:200;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,4,12,0.93);
+    backdrop-filter:blur(5px);
+  }
+  .overlay-box {
+    background:linear-gradient(135deg,#060f1c,#030810);
+    border:1px solid #1a2a3a;
+    box-shadow:0 0 60px rgba(0,200,255,0.14), inset 0 0 40px rgba(0,0,0,0.5);
+    padding:36px 46px;
+    text-align:center;
+    max-width:420px;
+    width:90vw;
+  }
+  .overlay-box h2 {
+    font-family:'Orbitron',monospace;
+    font-size:1.4rem;
+    font-weight:900;
+    letter-spacing:0.18em;
+    margin-bottom:8px;
+  }
+  .overlay-box p { opacity:0.65; font-size:0.75rem; line-height:1.85; margin-bottom:16px; }
+  .winner-msg { font-family:'Orbitron',monospace; font-size:1.7rem; font-weight:900; margin:12px 0; }
+  .btn {
+    font-family:'Orbitron',monospace;
+    font-size:0.75rem; font-weight:700;
+    letter-spacing:0.12em;
+    border:none; cursor:pointer;
+    padding:11px 28px; margin:4px;
+    transition:all 0.15s;
+  }
+  .btn-blue { background:var(--blue); color:#000; box-shadow:0 0 18px rgba(0,200,255,0.4); }
+  .btn-blue:hover { background:#fff; box-shadow:0 0 28px rgba(0,200,255,0.8); }
+  .legend {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:5px; margin:12px 0 16px; text-align:left; font-size:0.68rem;
+  }
+  .legend-item { display:flex; align-items:center; gap:6px; }
+  .dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
 
-  #game-area{flex:1;display:flex;min-height:0;}
-  .view-wrap{flex:1;position:relative;overflow:hidden;}
-  .view-wrap canvas{position:absolute;inset:0;width:100%;height:100%;}
-  #divider{width:3px;background:linear-gradient(180deg,transparent,#1a3a5a 20%,#4a9adf 50%,#1a3a5a 80%,transparent);flex-shrink:0;}
-  .corner-label{position:absolute;top:6px;left:6px;font-family:'Orbitron',monospace;font-size:.5rem;
-    letter-spacing:.1em;padding:2px 8px;border:1px solid;pointer-events:none;}
-  .cl-blue{color:var(--blue);border-color:var(--blue);background:rgba(0,200,255,.08);}
-  .cl-red {color:var(--red); border-color:var(--red); background:rgba(255,34,68,.08);}
-  .corner-ctrl{position:absolute;bottom:5px;left:6px;font-size:.48rem;opacity:.3;letter-spacing:.05em;}
+  /* IT indicator */
+  #it-bar {
+    display:flex; gap:20px; justify-content:center;
+    font-size:0.7rem; padding:2px 0 4px; flex-shrink:0;
+  }
+  .it-tag {
+    font-family:'Orbitron',monospace;
+    font-size:0.65rem; letter-spacing:0.1em;
+    padding:2px 10px;
+    border:1px solid transparent;
+    opacity:0.35;
+    transition:all 0.2s;
+  }
+  .it-tag.active { opacity:1; border-color:var(--gold); color:var(--gold); text-shadow:0 0 8px var(--gold); }
 
-  .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
-    background:rgba(0,4,12,.95);backdrop-filter:blur(8px);}
-  .obox{background:linear-gradient(135deg,#060f1c,#030810);border:1px solid #1a2a3a;
+  /* back link */
+  #back-link{position:fixed;top:8px;right:12px;z-index:300;font-size:.55rem;opacity:.35;
+    color:inherit;text-decoration:none;letter-spacing:.1em;}
+  #back-link:hover{opacity:.85;}
+
+  /* nickname home screen */
+  #nick-overlay{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,4,12,.97);backdrop-filter:blur(8px);}
+  #nick-overlay .nbox{background:linear-gradient(135deg,#060f1c,#030810);border:1px solid #1a2a3a;
     box-shadow:0 0 60px rgba(0,200,255,.15);padding:36px 44px;text-align:center;max-width:480px;width:92vw;}
-  .obox h2{font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:900;letter-spacing:.16em;margin-bottom:6px;}
-  .obox p{opacity:.5;font-size:.68rem;line-height:1.9;margin-bottom:16px;}
-  .name-row{display:flex;gap:12px;margin-bottom:6px;}
-  .name-wrap{flex:1;display:flex;flex-direction:column;gap:4px;}
-  .name-lbl{font-size:.58rem;letter-spacing:.12em;opacity:.65;}
-  .name-lbl.b{color:var(--blue);}  .name-lbl.r{color:var(--red);}
+  #nick-overlay h2{font-family:'Orbitron',monospace;font-size:1.25rem;font-weight:900;letter-spacing:.16em;
+    margin-bottom:6px;background:linear-gradient(90deg,var(--blue),#fff 50%,var(--red));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+  #nick-overlay p{opacity:.5;font-size:.68rem;line-height:1.9;margin-bottom:18px;}
+  .nick-row{display:flex;gap:12px;margin-bottom:6px;}
+  .nick-wrap{flex:1;display:flex;flex-direction:column;gap:4px;}
+  .nick-lbl{font-size:.58rem;letter-spacing:.12em;opacity:.65;}
+  .nick-lbl.b{color:var(--blue);} .nick-lbl.r{color:var(--red);}
   input.nick{background:rgba(0,20,40,.8);border:1px solid #1a3a5a;color:#fff;
     font-family:'Share Tech Mono',monospace;font-size:.9rem;padding:9px 10px;width:100%;
     text-align:center;outline:none;transition:border-color .2s;}
   input.nick:focus{border-color:var(--blue);box-shadow:0 0 10px rgba(0,200,255,.2);}
   input.nick.r:focus{border-color:var(--red);box-shadow:0 0 10px rgba(255,34,68,.2);}
   input.nick::placeholder{opacity:.28;}
-  .btn{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;letter-spacing:.14em;
-    border:none;cursor:pointer;padding:11px 28px;transition:all .15s;}
-  .btn-go{background:linear-gradient(90deg,var(--blue),#0088dd);color:#000;width:100%;margin-top:4px;
-    box-shadow:0 0 20px rgba(0,200,255,.3);}
-  .btn-go:hover{background:linear-gradient(90deg,#fff,var(--blue));}
-  .btn-sm{background:rgba(0,200,255,.12);color:var(--blue);border:1px solid var(--blue);
-    font-size:.62rem;padding:8px 20px;margin:4px;}
-  .btn-sm:hover{background:var(--blue);color:#000;}
-  .winner-txt{font-family:'Orbitron',monospace;font-size:1.9rem;font-weight:900;margin:8px 0;}
-  #back-link{position:fixed;top:8px;left:10px;z-index:200;font-size:.55rem;opacity:.35;
-    color:inherit;text-decoration:none;letter-spacing:.1em;}
-  #back-link:hover{opacity:.85;}
+  .btn-start{font-family:'Orbitron',monospace;font-size:.75rem;font-weight:700;letter-spacing:.14em;
+    border:none;cursor:pointer;padding:12px 0;width:100%;margin-top:4px;
+    background:linear-gradient(90deg,var(--blue),#0088dd);color:#000;
+    box-shadow:0 0 20px rgba(0,200,255,.3);transition:all .15s;}
+  .btn-start:hover{background:linear-gradient(90deg,#fff,var(--blue));}
 </style>
 </head>
 <body>
-<a href="/" id="back-link">← ONLINE</a>
 
-<div id="hud">
-  <div class="hud-team hud-blue">
-    <span class="hud-score" id="score-blue">0</span>
-    <span id="name-blue">BLUE</span>
-  </div>
-  <div id="hud-center">
-    <div id="hud-time">3:00</div>
-    <div id="hud-flash"></div>
-  </div>
-  <div class="hud-team hud-red" style="flex-direction:row-reverse">
-    <span class="hud-score" id="score-red">0</span>
-    <span id="name-red">RED</span>
-  </div>
-</div>
+<a href="/" id="back-link">← ONLINE MODE</a>
 
-<div id="game-area">
-  <div class="view-wrap" id="wrap-blue">
-    <canvas id="cv-blue"></canvas>
-    <div class="corner-label cl-blue" id="lbl-blue">🔵 BLUE</div>
-    <div class="corner-ctrl">WASD move · Q tag</div>
-  </div>
-  <div id="divider"></div>
-  <div class="view-wrap" id="wrap-red">
-    <canvas id="cv-red"></canvas>
-    <div class="corner-label cl-red" id="lbl-red">🔴 RED</div>
-    <div class="corner-ctrl">ARROWS move · / tag</div>
-  </div>
-</div>
-
-<!-- Home -->
-<div class="overlay" id="home-overlay">
-  <div class="obox">
-    <h2 style="background:linear-gradient(90deg,var(--blue),#fff 50%,var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">◈ LOCAL 2-PLAYER ◈</h2>
-    <p>Split-screen · same keyboard<br>Blue: <b>WASD + Q to tag</b> &nbsp;·&nbsp; Red: <b>Arrows + / to tag</b></p>
-    <div class="name-row">
-      <div class="name-wrap">
-        <div class="name-lbl b">🔵 BLUE</div>
+<div id="nick-overlay">
+  <div class="nbox">
+    <h2>◈ LOCAL 2-PLAYER ◈</h2>
+    <p>Two players · one keyboard<br>
+    Blue: <b>WASD + SPACE</b> &nbsp;·&nbsp; Red: <b>Arrow Keys + ENTER</b></p>
+    <div class="nick-row">
+      <div class="nick-wrap">
+        <div class="nick-lbl b">🔵 BLUE PLAYER</div>
         <input class="nick" id="nick-blue" maxlength="10" placeholder="BLUE NAME" autocomplete="off" spellcheck="false">
       </div>
-      <div class="name-wrap">
-        <div class="name-lbl r">🔴 RED</div>
+      <div class="nick-wrap">
+        <div class="nick-lbl r">🔴 RED PLAYER</div>
         <input class="nick r" id="nick-red" maxlength="10" placeholder="RED NAME" autocomplete="off" spellcheck="false">
       </div>
     </div>
-    <button class="btn btn-go" onclick="startGame()">▶ START</button>
-    <p style="margin-top:14px">Grab enemy flag · return to base · First to 5 wins</p>
+    <button class="btn-start" onclick="enterGame()">▶ START GAME</button>
   </div>
 </div>
 
-<!-- Game over -->
-<div class="overlay" id="over-overlay" style="display:none">
-  <div class="obox">
-    <h2 id="over-title">GAME OVER</h2>
-    <div class="winner-txt" id="over-winner"></div>
-    <p id="over-score" style="margin-bottom:16px"></p>
-    <button class="btn btn-sm" onclick="restartGame()">⚡ REMATCH</button>
-    <button class="btn btn-sm" onclick="goHome()">⌂ HOME</button>
+<header><h1>◈ CAPTURE THE FLAG ◈</h1></header>
+
+<div id="scoreboard">
+  <div class="score-block">
+    <span class="score-label">🔵 BLUE</span>
+    <span class="score-val blue-val" id="blue-score">0</span>
+  </div>
+  <div class="score-block">
+    <span class="score-label">⏱ TIME</span>
+    <span class="score-val time-val" id="timer">3:00</span>
+  </div>
+  <div class="score-block">
+    <span class="score-label">🔴 RED</span>
+    <span class="score-val red-val" id="red-score">0</span>
+  </div>
+</div>
+
+<div id="it-bar">
+  <span class="it-tag" id="blue-it">🔵 BLUE — IT</span>
+  <span class="it-tag" id="red-it">🔴 RED — IT</span>
+</div>
+
+<div id="game-wrap">
+  <canvas id="c"></canvas>
+  <div id="side-panel">
+    <div class="panel-box">
+      <h3>🔵 BLUE</h3>
+      <div class="key-row"><span class="kbd">W</span> Up</div>
+      <div class="key-row"><span class="kbd">S</span> Down</div>
+      <div class="key-row"><span class="kbd">A</span> Left</div>
+      <div class="key-row"><span class="kbd">D</span> Right</div>
+      <div class="key-row"><span class="kbd spc">SPACE</span> Tag</div>
+    </div>
+    <div class="panel-box red-box">
+      <h3>🔴 RED</h3>
+      <div class="key-row"><span class="kbd red">↑</span> Up</div>
+      <div class="key-row"><span class="kbd red">↓</span> Down</div>
+      <div class="key-row"><span class="kbd red">←</span> Left</div>
+      <div class="key-row"><span class="kbd red">→</span> Right</div>
+      <div class="key-row"><span class="kbd red" style="min-width:50px">ENTER</span> Tag</div>
+    </div>
+    <div class="panel-box">
+      <h3>📋 RULES</h3>
+      Grab the enemy 🚩 flag and return it to your base.<br><br>
+      Press your <b style="color:var(--gold)">tag key</b> near the enemy to send them to spawn and drop their flag.<br><br>
+      Dropped flags return home in <b style="color:var(--gold)">5 seconds</b>.<br><br>
+      First to <b style="color:var(--gold)">3 caps</b> wins!
+    </div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="overlay-box" id="overlay-box">
+    <h2 style="color:var(--blue)">CAPTURE THE FLAG</h2>
+    <p>Two players, one keyboard. Steal the enemy flag and return it to your base. Get close and press your tag key to freeze the opponent and drop their flag.</p>
+    <div class="legend">
+      <div class="legend-item"><div class="dot" style="background:var(--blue)"></div> Blue player</div>
+      <div class="legend-item"><div class="dot" style="background:var(--red)"></div> Red player</div>
+      <div class="legend-item"><div class="dot" style="background:var(--gold)"></div> Flags</div>
+      <div class="legend-item"><div class="dot" style="background:#334466"></div> Walls/cover</div>
+    </div>
+    <button class="btn btn-blue" onclick="startGame()">⚡ START GAME</button>
   </div>
 </div>
 
 <script>
-// ═══ CONSTANTS ════════════════════════════════════════════════════
-const TILE         = 20;
-const COLS         = 48;   // smaller map (was 80)
-const ROWS         = 30;   // smaller map (was 50)
-const W            = COLS * TILE;   // 960
-const H            = ROWS * TILE;   // 600
-const SPEED        = 5.5;           // faster (was 3.8)
-const SPEED_FLAG   = 3.8;           // flag carrier (was 2.8)
-const PLAYER_SIZE  = 16;
-const TAG_RANGE    = 52;            // slightly bigger hit window
-const TAG_COOLDOWN = 55;
-const FLAG_RETURN  = 180;           // frames (~3s at 60fps)
-const FPS          = 60;
-const MAX_SCORE    = 5;
+// ── Canvas setup ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
 
-const CLR = {
-  bg:'#06090f', blue:'#00cfff', blueDark:'#004466',
-  red:'#ff2244', redDark:'#550011',
-  gold:'#ffd700', wall:'#1a2d40', wallStroke:'#2a4060',
+const TILE = 20;
+let COLS, ROWS;
+
+function resize() {
+  const wrap = document.getElementById('game-wrap');
+  const availH = wrap.clientHeight - 12;
+  const availW = wrap.clientWidth - 155 - 10 - 16;
+  COLS = Math.floor(availW / TILE);
+  ROWS = Math.floor(availH / TILE);
+  // Clamp to reasonable
+  COLS = Math.max(28, Math.min(55, COLS));
+  ROWS = Math.max(22, Math.min(38, ROWS));
+  canvas.width  = COLS * TILE;
+  canvas.height = ROWS * TILE;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const SPEED       = 2.2;    // pixels per frame (slow)
+const PLAYER_SIZE = 16;
+const TAG_RANGE   = 36;
+const TAG_FREEZE  = 60;    // frames frozen
+const TAG_COOLDOWN= 60;
+const FLAG_RETURN = 5 * 50; // 5 seconds at 50fps
+const FPS         = 50;
+
+// ── Colours ───────────────────────────────────────────────────────────────────
+const C = {
+  bg:'#06090f', grid:'#080d16',
+  blue:'#00cfff', blueGlow:'rgba(0,200,255,0.5)', blueDark:'#004466',
+  red:'#ff2244',  redGlow:'rgba(255,34,68,0.5)',  redDark:'#550011',
+  gold:'#ffd700', green:'#00ff88',
+  wall:'#1a2d40', wallStroke:'#2a4060',
 };
 
-// ═══ MAP ══════════════════════════════════════════════════════════
+// ── Walls (maze-like cover) ───────────────────────────────────────────────────
 function makeWalls() {
-  const C = COLS, R = ROWS;
-  // Compact symmetric walls for smaller map
+  // Returns array of {x,y,w,h} in tile coords
+  const W = COLS, H = ROWS;
   return [
-    // Side bunkers
-    {x:4, y:6,  w:2, h:5}, {x:4, y:19, w:2, h:5},
-    {x:C-6,y:6, w:2, h:5}, {x:C-6,y:19,w:2, h:5},
-    // Mid-lane blockers
-    {x:10,y:4, w:4,h:2}, {x:10,y:R-6,w:4,h:2},
-    {x:C-14,y:4,w:4,h:2},{x:C-14,y:R-6,w:4,h:2},
+    // Horizontal bars
+    {x:Math.floor(W*0.25), y:Math.floor(H*0.25), w:4, h:2},
+    {x:Math.floor(W*0.25), y:Math.floor(H*0.70), w:4, h:2},
+    {x:Math.floor(W*0.72), y:Math.floor(H*0.25), w:4, h:2},
+    {x:Math.floor(W*0.72), y:Math.floor(H*0.70), w:4, h:2},
     // Centre cross
-    {x:C/2-2,y:R/2-3,w:4,h:6},
-    // Quarter obstacles
-    {x:Math.round(C*.25),y:Math.round(R*.3), w:3,h:4},
-    {x:Math.round(C*.25),y:Math.round(R*.6), w:3,h:3},
-    {x:Math.round(C*.72),y:Math.round(R*.3), w:3,h:4},
-    {x:Math.round(C*.72),y:Math.round(R*.6), w:3,h:3},
+    {x:Math.floor(W/2)-1,  y:Math.floor(H*0.20), w:2, h:3},
+    {x:Math.floor(W/2)-1,  y:Math.floor(H*0.60), w:2, h:3},
+    {x:Math.floor(W*0.35), y:Math.floor(H/2)-1,  w:3, h:2},
+    {x:Math.floor(W*0.62), y:Math.floor(H/2)-1,  w:3, h:2},
   ];
 }
 
-const WALLS = makeWalls();
-const RECTS = WALLS.map(w=>({x:w.x*TILE,y:w.y*TILE,w:w.w*TILE,h:w.h*TILE}));
-
-const BLUE_SPAWN = {x: TILE*2 + PLAYER_SIZE/2, y: H/2};
-const RED_SPAWN  = {x: W - TILE*2 - PLAYER_SIZE/2, y: H/2};
-const BLUE_BASE  = {x: TILE*2, y: H/2};
-const RED_BASE   = {x: W - TILE*2, y: H/2};
-
-function collidesWall(px, py) {
-  const h = PLAYER_SIZE/2;
-  return RECTS.some(w => px-h < w.x+w.w && px+h > w.x && py-h < w.y+w.h && py+h > w.y);
+function wallsToRects(walls) {
+  return walls.map(w => ({
+    x: w.x * TILE, y: w.y * TILE,
+    w: w.w * TILE, h: w.h * TILE,
+  }));
 }
-function dist(a,b){ return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
 
-// ═══ STATE ════════════════════════════════════════════════════════
-let game = null;
+function collidesWall(px, py, size, rects) {
+  const l=px-size/2, r=px+size/2, t=py-size/2, b=py+size/2;
+  return rects.some(w => l<w.x+w.w && r>w.x && t<w.y+w.h && b>w.y);
+}
 
-function makeGame(bName, rName) {
+// ── Player ────────────────────────────────────────────────────────────────────
+function makePlayer(isBlue) {
+  const margin = TILE * 3;
+  const spawnX = isBlue ? margin + PLAYER_SIZE/2 : canvas.width - margin - PLAYER_SIZE/2;
+  const spawnY = canvas.height / 2;
   return {
-    phase: 'playing',
-    tick: 0,
-    timeLeft: 180,   // 3 minutes for smaller map
-    scoreBlue: 0,
-    scoreRed: 0,
-    flash: '', flashTimer: 0,
-    tagEffects: [],
-    players: {
-      blue: {
-        team:'blue', name:bName,
-        x:BLUE_SPAWN.x, y:BLUE_SPAWN.y,
-        spawnX:BLUE_SPAWN.x, spawnY:BLUE_SPAWN.y,
-        hasFlag:false, tagCooldown:0, tagPressed:false,
-        keys:{up:false,down:false,left:false,right:false},
-      },
-      red: {
-        team:'red', name:rName,
-        x:RED_SPAWN.x, y:RED_SPAWN.y,
-        spawnX:RED_SPAWN.x, spawnY:RED_SPAWN.y,
-        hasFlag:false, tagCooldown:0, tagPressed:false,
-        keys:{up:false,down:false,left:false,right:false},
-      },
-    },
-    blueFlag:{ x:BLUE_BASE.x, y:BLUE_BASE.y, carriedBy:null, home:true, returnTimer:0 },
-    redFlag: { x:RED_BASE.x,  y:RED_BASE.y,  carriedBy:null, home:true, returnTimer:0 },
+    isBlue,
+    x: spawnX, y: spawnY,
+    spawnX, spawnY,
+    vx:0, vy:0,
+    hasFlag: false,
+    frozen: 0,
+    tagCooldown: 0,
+    score: 0,
   };
 }
 
-// ═══ CANVAS ═══════════════════════════════════════════════════════
-const cvB = document.getElementById('cv-blue');
-const cvR = document.getElementById('cv-red');
-const ctxB = cvB.getContext('2d');
-const ctxR = cvR.getContext('2d');
+// ── Flag & base positions ─────────────────────────────────────────────────────
+function makeState() {
+  const walls = makeWalls();
+  const rects = wallsToRects(walls);
 
-function resizeCanvases() {
-  const wB = document.getElementById('wrap-blue');
-  const wR = document.getElementById('wrap-red');
-  cvB.width  = wB.clientWidth;  cvB.height = wB.clientHeight;
-  cvR.width  = wR.clientWidth;  cvR.height = wR.clientHeight;
+  const blueBase = { x: TILE*2, y: canvas.height/2 };
+  const redBase  = { x: canvas.width - TILE*2, y: canvas.height/2 };
+
+  const blue = makePlayer(true);
+  const red  = makePlayer(false);
+
+  return {
+    blue, red,
+    blueBase, redBase,
+    // Flags always exist. carriedBy: null | 'blue' | 'red'
+    // Only the OPPOSITE team can pick up a flag (blue picks red flag, red picks blue flag)
+    blueFlag: { x: blueBase.x, y: blueBase.y, carriedBy: null, home: true, returnTimer: 0, homeX: blueBase.x, homeY: blueBase.y },
+    redFlag:  { x: redBase.x,  y: redBase.y,  carriedBy: null, home: true, returnTimer: 0, homeX: redBase.x,  homeY: redBase.y  },
+    walls, rects,
+    scoreBlue: 0, scoreRed: 0,
+    timeLeft: 180,
+    tick: 0,
+    over: false,
+    flash: null, flashTimer: 0,
+    tagEffect: [],   // {x,y,r,life,color}
+  };
 }
-window.addEventListener('resize', resizeCanvases);
 
-// ═══ INPUT ════════════════════════════════════════════════════════
-const held = {};
+// ── Keys held ─────────────────────────────────────────────────────────────────
+const keys = {};
 window.addEventListener('keydown', e => {
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','/'].includes(e.key)) e.preventDefault();
-  if(held[e.key]) return;   // ignore key-repeat for tag
-  held[e.key] = true;
-  syncKeys();
-  if(game && game.phase==='playing') {
-    if(e.key==='q'||e.key==='Q') game.players.blue.tagPressed = true;
-    if(e.key==='/'||e.key==='?') game.players.red.tagPressed  = true;
+  // Space and Enter are one-shot tag actions — don't add to held keys map
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (state && !state.over) doTag('blue');
+    return;
   }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (state && !state.over) doTag('red');
+    return;
+  }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
 });
-window.addEventListener('keyup', e => { held[e.key]=false; syncKeys(); });
+window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-function syncKeys() {
-  if(!game) return;
-  const b=game.players.blue, r=game.players.red;
-  b.keys.up    = !!(held['w']||held['W']);
-  b.keys.down  = !!(held['s']||held['S']);
-  b.keys.left  = !!(held['a']||held['A']);
-  b.keys.right = !!(held['d']||held['D']);
-  r.keys.up    = !!held['ArrowUp'];
-  r.keys.down  = !!held['ArrowDown'];
-  r.keys.left  = !!held['ArrowLeft'];
-  r.keys.right = !!held['ArrowRight'];
-}
+// ── Tag action ────────────────────────────────────────────────────────────────
+function doTag(who) {
+  const attacker = state[who];
+  const defender = who==='blue' ? state.red : state.blue;
+  if (attacker.tagCooldown > 0 || attacker.frozen > 0) return;
 
-// ═══ PHYSICS ══════════════════════════════════════════════════════
-function movePlayer(p) {
-  const spd = p.hasFlag ? SPEED_FLAG : SPEED;
-  const k = p.keys;
-  let dx=0, dy=0;
-  if(k.up)    dy -= spd;
-  if(k.down)  dy += spd;
-  if(k.left)  dx -= spd;
-  if(k.right) dx += spd;
-  if(dx && dy){ dx*=0.707; dy*=0.707; }
-  const half = PLAYER_SIZE/2;
-  const nx = Math.max(half, Math.min(W-half, p.x+dx));
-  const ny = Math.max(half, Math.min(H-half, p.y+dy));
-  if(!collidesWall(nx, p.y)) p.x=nx;
-  if(!collidesWall(p.x, ny)) p.y=ny;
-}
+  const dx = attacker.x - defender.x;
+  const dy = attacker.y - defender.y;
+  const d = Math.sqrt(dx*dx + dy*dy);
 
-function doTag(attacker, defender) {
-  if(attacker.tagCooldown > 0) return;
-  const d = dist(attacker, defender);
-  if(d > TAG_RANGE) return;
   attacker.tagCooldown = TAG_COOLDOWN;
-  // Visual burst on attacker
-  game.tagEffects.push({x:attacker.x,y:attacker.y,r:6,life:25,color:attacker.team==='blue'?CLR.blue:CLR.red});
-  // Drop flag if carrying
-  if(defender.hasFlag) {
-    defender.hasFlag = false;
-    // Figure out which flag the defender was carrying:
-    // blue player carries redFlag, red player carries blueFlag
-    const flag = defender.team==='blue' ? game.redFlag : game.blueFlag;
-    flag.carriedBy = null;
-    flag.x = defender.x; flag.y = defender.y;
-    flag.home = false; flag.returnTimer = FLAG_RETURN;
+
+  // Visual pulse from attacker
+  state.tagEffect.push({ x:attacker.x, y:attacker.y, r:8, life:30,
+    color: who==='blue' ? C.blue : C.red });
+
+  if (d < TAG_RANGE) {
+    // Drop flag at defender's current position with 5s return timer
+    if (defender.hasFlag) {
+      defender.hasFlag = false;
+      // Figure out which flag the defender was carrying (opposite of their own colour)
+      const flagKey = defender.isBlue ? 'redFlag' : 'blueFlag';
+      const flag = state[flagKey];
+      flag.carriedBy = null;
+      flag.x = defender.x;
+      flag.y = defender.y;
+      flag.home = false;
+      flag.returnTimer = FLAG_RETURN;
+    }
+    // Ripple at defender
+    state.tagEffect.push({ x:defender.x, y:defender.y, r:24, life:40,
+      color: who==='blue' ? C.red : C.blue });
+    // Teleport defender back to spawn
+    defender.x = defender.spawnX;
+    defender.y = defender.spawnY;
+    defender.vx = 0; defender.vy = 0;
+    flash('💥 ' + (who==='blue' ? redName : blueName) + ' sent back to spawn!');
   }
-  // Send defender back to spawn
-  game.tagEffects.push({x:defender.x,y:defender.y,r:22,life:35,color:defender.team==='blue'?CLR.blue:CLR.red});
-  defender.x = defender.spawnX; defender.y = defender.spawnY;
-  setFlash('💥 ' + defender.name + ' sent to spawn!');
 }
 
-function setFlash(msg){ game.flash=msg; game.flashTimer=150; }
+// ── Update ────────────────────────────────────────────────────────────────────
+function updatePlayer(p, up, down, left, right) {
+  if (p.frozen > 0) { p.frozen--; p.vx=0; p.vy=0; return; }
+  if (p.tagCooldown > 0) p.tagCooldown--;
 
-// ═══ TICK ═════════════════════════════════════════════════════════
-function gameTick() {
-  if(!game || game.phase!=='playing') return;
-  game.tick++;
+  const spd = SPEED;
+  let dx=0, dy=0;
+  if (keys[up])    dy -= spd;
+  if (keys[down])  dy += spd;
+  if (keys[left])  dx -= spd;
+  if (keys[right]) dx += spd;
 
-  // Countdown timer
-  if(game.tick % FPS === 0) {
-    game.timeLeft--;
-    if(game.timeLeft <= 0){ endGame(); return; }
-  }
+  // Diagonal normalise
+  if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
 
-  const b=game.players.blue, r=game.players.red;
-  const bf=game.blueFlag, rf=game.redFlag;
+  const half = PLAYER_SIZE / 2;
+  const nx = Math.max(half, Math.min(canvas.width  - half, p.x + dx));
+  const ny = Math.max(half, Math.min(canvas.height - half, p.y + dy));
 
-  movePlayer(b); movePlayer(r);
-
-  // Process tags (tagPressed set on keydown, consumed here)
-  if(b.tagPressed){ b.tagPressed=false; doTag(b,r); }
-  if(r.tagPressed){ r.tagPressed=false; doTag(r,b); }
-  if(b.tagCooldown>0) b.tagCooldown--;
-  if(r.tagCooldown>0) r.tagCooldown--;
-
-  // Flag pickup: blue grabs red flag
-  if(!b.hasFlag && rf.carriedBy===null && dist(b,rf)<PLAYER_SIZE+12) {
-    b.hasFlag=true; rf.carriedBy='blue'; rf.home=false; rf.returnTimer=0;
-    setFlash('🔵 '+b.name+' grabbed the RED flag!');
-  }
-  // Flag pickup: red grabs blue flag
-  if(!r.hasFlag && bf.carriedBy===null && dist(r,bf)<PLAYER_SIZE+12) {
-    r.hasFlag=true; bf.carriedBy='red'; bf.home=false; bf.returnTimer=0;
-    setFlash('🔴 '+r.name+' grabbed the BLUE flag!');
-  }
-
-  // Move flags with carriers
-  if(rf.carriedBy==='blue'){ rf.x=b.x; rf.y=b.y; }
-  if(bf.carriedBy==='red') { bf.x=r.x; bf.y=r.y; }
-
-  // Auto-return dropped flags
-  if(rf.carriedBy===null && !rf.home){ rf.returnTimer--; if(rf.returnTimer<=0){ rf.x=RED_BASE.x;rf.y=RED_BASE.y;rf.home=true;setFlash('🔴 Red flag returned!'); }}
-  if(bf.carriedBy===null && !bf.home){ bf.returnTimer--; if(bf.returnTimer<=0){ bf.x=BLUE_BASE.x;bf.y=BLUE_BASE.y;bf.home=true;setFlash('🔵 Blue flag returned!'); }}
-
-  // Capture: blue brings red flag to blue base
-  if(b.hasFlag && dist(b,BLUE_BASE)<PLAYER_SIZE+16){
-    b.hasFlag=false; rf.carriedBy=null; rf.home=true; rf.x=RED_BASE.x; rf.y=RED_BASE.y; rf.returnTimer=0;
-    game.scoreBlue++;
-    document.getElementById('score-blue').textContent = game.scoreBlue;
-    setFlash('⭐ '+b.name+' scores! Blue: '+game.scoreBlue);
-    if(game.scoreBlue>=MAX_SCORE){ endGame(); return; }
-  }
-  // Capture: red brings blue flag to red base
-  if(r.hasFlag && dist(r,RED_BASE)<PLAYER_SIZE+16){
-    r.hasFlag=false; bf.carriedBy=null; bf.home=true; bf.x=BLUE_BASE.x; bf.y=BLUE_BASE.y; bf.returnTimer=0;
-    game.scoreRed++;
-    document.getElementById('score-red').textContent = game.scoreRed;
-    setFlash('⭐ '+r.name+' scores! Red: '+game.scoreRed);
-    if(game.scoreRed>=MAX_SCORE){ endGame(); return; }
-  }
-
-  // Effects decay
-  if(game.flashTimer>0) game.flashTimer--;
-  for(let i=game.tagEffects.length-1;i>=0;i--){
-    game.tagEffects[i].r+=2.5; game.tagEffects[i].life--;
-    if(game.tagEffects[i].life<=0) game.tagEffects.splice(i,1);
-  }
-
-  // HUD
-  const m=Math.floor(game.timeLeft/60), s=game.timeLeft%60;
-  const te=document.getElementById('hud-time');
-  te.textContent = m+':'+(s<10?'0':'')+s;
-  te.style.color = game.timeLeft<=30?'#ff4444':CLR.gold;
-  const fe=document.getElementById('hud-flash');
-  fe.textContent = game.flashTimer>0 ? game.flash : '';
-  fe.style.opacity = Math.min(1, game.flashTimer/30);
+  if (!collidesWall(nx, p.y, PLAYER_SIZE, state.rects)) p.x = nx;
+  if (!collidesWall(p.x, ny, PLAYER_SIZE, state.rects)) p.y = ny;
+  p.vx = dx; p.vy = dy;
 }
 
-// ═══ RENDER ═══════════════════════════════════════════════════════
-function renderView(ctx, team) {
-  const vw=ctx.canvas.width, vh=ctx.canvas.height;
-  if(vw===0||vh===0) return;
-  const fp=game.players[team];
-  if(!fp) return;
+function dist(a, b) { return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
 
-  // Camera: clamp so we don't show outside the map
-  const camX = Math.max(0, Math.min(W-vw, fp.x - vw/2));
-  const camY = Math.max(0, Math.min(H-vh, fp.y - vh/2));
+function update() {
+  if (!state || state.over) return;
+  state.tick++;
 
-  ctx.fillStyle=CLR.bg;
-  ctx.fillRect(0,0,vw,vh);
+  // Timer (every FPS frames = 1 second)
+  if (state.tick % FPS === 0) {
+    state.timeLeft--;
+    updateTimerEl(state.timeLeft);
+    if (state.timeLeft <= 0) {
+      endGame(state.scoreBlue > state.scoreRed ? 'blue' :
+              state.scoreRed > state.scoreBlue ? 'red' : 'draw');
+      return;
+    }
+  }
 
-  ctx.save();
-  ctx.translate(-camX,-camY);
+  updatePlayer(state.blue, 'w','s','a','d');
+  updatePlayer(state.red,  'ArrowUp','ArrowDown','ArrowLeft','ArrowRight');
+
+  // Flag pickup — only opposite team can grab a flag
+  // Blue can ONLY pick up the RED flag; Red can ONLY pick up the BLUE flag
+  const rf = state.redFlag;
+  const bf = state.blueFlag;
+
+  if (!state.blue.hasFlag && rf.carriedBy === null && dist(state.blue, rf) < PLAYER_SIZE + 8) {
+    state.blue.hasFlag = true;
+    rf.carriedBy = 'blue';
+    rf.home = false;
+    rf.returnTimer = 0; // stop return timer while carried
+    flash('🔵 ' + blueName + ' grabbed the RED flag!');
+  }
+  if (!state.red.hasFlag && bf.carriedBy === null && dist(state.red, bf) < PLAYER_SIZE + 8) {
+    state.red.hasFlag = true;
+    bf.carriedBy = 'red';
+    bf.home = false;
+    bf.returnTimer = 0;
+    flash('🔴 ' + redName + ' grabbed the BLUE flag!');
+  }
+
+  // Move carried flags with their carrier
+  if (rf.carriedBy === 'blue') { rf.x = state.blue.x; rf.y = state.blue.y; }
+  if (bf.carriedBy === 'red')  { bf.x = state.red.x;  bf.y = state.red.y; }
+
+  // Dropped flag return timers — count down and snap back to home after 5s
+  if (rf.carriedBy === null && !rf.home && rf.returnTimer > 0) {
+    rf.returnTimer--;
+    if (rf.returnTimer <= 0) {
+      rf.x = rf.homeX; rf.y = rf.homeY; rf.home = true;
+      flash('🔴 Red flag returned to base!');
+    }
+  }
+  if (bf.carriedBy === null && !bf.home && bf.returnTimer > 0) {
+    bf.returnTimer--;
+    if (bf.returnTimer <= 0) {
+      bf.x = bf.homeX; bf.y = bf.homeY; bf.home = true;
+      flash('🔵 Blue flag returned to base!');
+    }
+  }
+
+  // Capture — blue reaches blue base while carrying red flag
+  if (state.blue.hasFlag && dist(state.blue, state.blueBase) < PLAYER_SIZE + 10) {
+    state.blue.hasFlag = false;
+    rf.carriedBy = null; rf.home = true; rf.x = rf.homeX; rf.y = rf.homeY; rf.returnTimer = 0;
+    state.scoreBlue++;
+    document.getElementById('blue-score').textContent = state.scoreBlue;
+    flash('⭐ ' + blueName + ' CAPTURES! ' + state.scoreBlue + ' / 3');
+    if (state.scoreBlue >= 3) { endGame('blue'); return; }
+  }
+  // Capture — red reaches red base while carrying blue flag
+  if (state.red.hasFlag && dist(state.red, state.redBase) < PLAYER_SIZE + 10) {
+    state.red.hasFlag = false;
+    bf.carriedBy = null; bf.home = true; bf.x = bf.homeX; bf.y = bf.homeY; bf.returnTimer = 0;
+    state.scoreRed++;
+    document.getElementById('red-score').textContent = state.scoreRed;
+    flash('⭐ ' + redName + ' CAPTURES! ' + state.scoreRed + ' / 3');
+    if (state.scoreRed >= 3) { endGame('red'); return; }
+  }
+
+  // Tag effects decay
+  for (let i = state.tagEffect.length-1; i>=0; i--) {
+    const e = state.tagEffect[i];
+    e.r += 2; e.life--;
+    if (e.life <= 0) state.tagEffect.splice(i,1);
+  }
+
+  if (state.flashTimer > 0) state.flashTimer--;
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function drawBase(b, color) {
+  const s = TILE * 2;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+  ctx.strokeRect(b.x - s/2, b.y - s/2, s, s);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.07;
+  ctx.fillRect(b.x - s/2, b.y - s/2, s, s);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.font = '7px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('BASE', b.x, b.y - s/2 - 4);
+}
+
+function drawFlag(f, color) {
+  if (!f) return;
+  const pole = 14;
+  ctx.fillStyle = '#aaa';
+  ctx.fillRect(f.x - 1, f.y - pole, 2, pole);
+  ctx.fillStyle = color;
+  ctx.shadowColor = color; ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(f.x + 1, f.y - pole);
+  ctx.lineTo(f.x + 12, f.y - pole + 5);
+  ctx.lineTo(f.x + 1,  f.y - pole + 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Draw return countdown ring if flag is dropped on ground
+  if (!f.home && f.returnTimer > 0) {
+    const frac = f.returnTimer / FLAG_RETURN;
+    const secs = Math.ceil(f.returnTimer / FPS);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.7;
+    // Background ring
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 14, 0, Math.PI * 2);
+    ctx.globalAlpha = 0.15;
+    ctx.stroke();
+    // Countdown arc
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 14, -Math.PI/2, -Math.PI/2 + frac * Math.PI * 2);
+    ctx.stroke();
+    // Seconds label
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = color;
+    ctx.font = 'bold 9px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(secs + 's', f.x, f.y + 4);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPlayer(p) {
+  const color = p.isBlue ? C.blue : C.red;
+  const dark  = p.isBlue ? C.blueDark : C.redDark;
+  const half  = PLAYER_SIZE / 2;
+
+  // Frozen shimmer
+  if (p.frozen > 0) {
+    ctx.shadowColor = '#aaeeff';
+    ctx.shadowBlur = 18 + Math.sin(Date.now()/80)*6;
+  } else {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+  }
+
+  // Body
+  ctx.fillStyle = p.frozen > 0 ? '#aaeeff' : color;
+  ctx.fillRect(p.x - half, p.y - half, PLAYER_SIZE, PLAYER_SIZE);
+  ctx.shadowBlur = 0;
+
+  // Inner shading
+  ctx.fillStyle = dark;
+  ctx.fillRect(p.x - half + 3, p.y - half + 3, PLAYER_SIZE - 6, PLAYER_SIZE - 6);
+
+  // Eyes
+  ctx.fillStyle = p.frozen > 0 ? '#004488' : '#fff';
+  ctx.fillRect(p.x - 4, p.y - 3, 3, 3);
+  ctx.fillRect(p.x + 1, p.y - 3, 3, 3);
+
+  // Cooldown ring on player
+  if (p.tagCooldown > 0) {
+    const frac = 1 - p.tagCooldown / TAG_COOLDOWN;
+    ctx.strokeStyle = C.gold;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, half + 5, -Math.PI/2, -Math.PI/2 + frac * Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Flag on player
+  if (p.hasFlag) {
+    const fc = p.isBlue ? C.red : C.blue; // carrying enemy flag colour
+    ctx.fillStyle = fc;
+    ctx.shadowColor = fc; ctx.shadowBlur = 10;
+    ctx.fillRect(p.x - 1, p.y - half - 12, 2, 12);
+    ctx.beginPath();
+    ctx.moveTo(p.x + 1, p.y - half - 12);
+    ctx.lineTo(p.x + 9, p.y - half - 7);
+    ctx.lineTo(p.x + 1, p.y - half - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // IT ring for tagging proximity indicator
+  const other = p.isBlue ? state.red : state.blue;
+  const d = dist(p, other);
+  if (d < TAG_RANGE + 10) {
+    const alpha = Math.max(0, 1 - d/TAG_RANGE) * 0.8;
+    ctx.strokeStyle = C.gold;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = alpha;
+    ctx.setLineDash([3,3]);
+    ctx.strokeRect(p.x - TAG_RANGE, p.y - TAG_RANGE, TAG_RANGE*2, TAG_RANGE*2);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function draw() {
+  if (!state) return;
+
+  // Background
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Grid
-  ctx.strokeStyle='#0a1220'; ctx.lineWidth=0.5;
-  const sx=Math.floor(camX/TILE)*TILE, sy=Math.floor(camY/TILE)*TILE;
-  for(let x=sx;x<camX+vw+TILE;x+=TILE){ctx.beginPath();ctx.moveTo(x,camY);ctx.lineTo(x,camY+vh);ctx.stroke();}
-  for(let y=sy;y<camY+vh+TILE;y+=TILE){ctx.beginPath();ctx.moveTo(camX,y);ctx.lineTo(camX+vw,y);ctx.stroke();}
+  ctx.strokeStyle = '#0b1520';
+  ctx.lineWidth = 0.5;
+  for (let x=0; x<=COLS; x++) { ctx.beginPath(); ctx.moveTo(x*TILE,0); ctx.lineTo(x*TILE,canvas.height); ctx.stroke(); }
+  for (let y=0; y<=ROWS; y++) { ctx.beginPath(); ctx.moveTo(0,y*TILE); ctx.lineTo(canvas.width,y*TILE); ctx.stroke(); }
 
   // Walls
-  RECTS.forEach(w=>{
-    ctx.fillStyle=CLR.wall; ctx.fillRect(w.x,w.y,w.w,w.h);
-    ctx.strokeStyle=CLR.wallStroke; ctx.lineWidth=1; ctx.strokeRect(w.x,w.y,w.w,w.h);
+  state.rects.forEach(w => {
+    ctx.fillStyle = C.wall;
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.strokeStyle = C.wallStroke;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(w.x, w.y, w.w, w.h);
   });
 
   // Bases
-  [[BLUE_BASE,CLR.blue,'BLUE'],[RED_BASE,CLR.red,'RED']].forEach(([base,col,lbl])=>{
-    ctx.save();
-    ctx.shadowColor=col; ctx.shadowBlur=16;
-    ctx.strokeStyle=col; ctx.lineWidth=2; ctx.globalAlpha=.55;
-    ctx.strokeRect(base.x-24,base.y-24,48,48);
-    ctx.globalAlpha=1; ctx.fillStyle=col+'18'; ctx.fillRect(base.x-24,base.y-24,48,48);
-    ctx.shadowBlur=0; ctx.fillStyle=col; ctx.font='bold 9px Share Tech Mono'; ctx.textAlign='center';
-    ctx.fillText(lbl,base.x,base.y+4);
-    ctx.restore();
+  drawBase(state.blueBase, C.blue);
+  drawBase(state.redBase,  C.red);
+
+  // Flags always exist — draw both always
+  drawFlag(state.blueFlag, C.blue);
+  drawFlag(state.redFlag,  C.red);
+
+  // Tag ripple effects
+  state.tagEffect.forEach(e => {
+    ctx.strokeStyle = e.color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = Math.max(0, e.life / 40) * 0.7;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   });
 
-  // Flags (only when not carried)
-  drawFlag(ctx, game.blueFlag, CLR.blue);
-  drawFlag(ctx, game.redFlag,  CLR.red);
+  // Players
+  drawPlayer(state.blue);
+  drawPlayer(state.red);
 
-  // Tag effects
-  game.tagEffects.forEach(e=>{
-    ctx.save();
-    ctx.strokeStyle=e.color; ctx.lineWidth=2.5;
-    ctx.globalAlpha=Math.max(0,e.life/35)*0.8;
-    ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.stroke();
-    ctx.restore();
-  });
-
-  // Tag range ring on focus player
-  ctx.save();
-  ctx.strokeStyle=CLR.gold; ctx.lineWidth=1; ctx.globalAlpha=0.12;
-  ctx.setLineDash([3,5]);
-  ctx.beginPath(); ctx.arc(fp.x,fp.y,TAG_RANGE,0,Math.PI*2); ctx.stroke();
-  ctx.restore();
-
-  // Players — enemy first so self renders on top
-  const other = team==='blue' ? 'red' : 'blue';
-  drawPlayer(ctx, game.players[other], false);
-  drawPlayer(ctx, game.players[team],  true);
-
-  ctx.restore();
-}
-
-function drawFlag(ctx, flag, col) {
-  if(flag.carriedBy!==null) return;
-  ctx.save();
-  ctx.shadowColor=col; ctx.shadowBlur=12;
-  ctx.globalAlpha=flag.home?1:0.55;
-  ctx.fillStyle=col;
-  // Diamond shape
-  ctx.beginPath();
-  ctx.moveTo(flag.x, flag.y-9);
-  ctx.lineTo(flag.x+7, flag.y);
-  ctx.lineTo(flag.x, flag.y+9);
-  ctx.lineTo(flag.x-7, flag.y);
-  ctx.closePath(); ctx.fill();
-  if(!flag.home){
-    const frac=Math.max(0,flag.returnTimer/FLAG_RETURN);
-    ctx.shadowBlur=0; ctx.globalAlpha=1;
-    ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(flag.x-14,flag.y+12,28,3);
-    ctx.fillStyle=col; ctx.fillRect(flag.x-14,flag.y+12,28*frac,3);
-  }
-  ctx.restore();
-}
-
-function drawPlayer(ctx, p, isMe) {
-  const col  = p.team==='blue'?CLR.blue:CLR.red;
-  const dark = p.team==='blue'?CLR.blueDark:CLR.redDark;
-  const half = PLAYER_SIZE/2;
-  ctx.save();
-
-  // Body glow + fill
-  ctx.shadowColor=col; ctx.shadowBlur=isMe?18:6;
-  ctx.fillStyle=col; ctx.fillRect(p.x-half,p.y-half,PLAYER_SIZE,PLAYER_SIZE);
-  ctx.shadowBlur=0;
-  ctx.fillStyle=dark; ctx.fillRect(p.x-half+3,p.y-half+3,PLAYER_SIZE-6,PLAYER_SIZE-6);
-
-  // Self outline
-  if(isMe){ ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(p.x-half-2,p.y-half-2,PLAYER_SIZE+4,PLAYER_SIZE+4); }
-
-  // Eyes (direction indicator)
-  ctx.fillStyle='#fff';
-  ctx.fillRect(p.x-4,p.y-2,3,3);
-  ctx.fillRect(p.x+1,p.y-2,3,3);
-
-  // Cooldown arc
-  if(p.tagCooldown>0){
-    ctx.save();
-    ctx.strokeStyle=CLR.gold; ctx.lineWidth=2; ctx.globalAlpha=0.7;
-    const frac=1-p.tagCooldown/TAG_COOLDOWN;
-    ctx.beginPath(); ctx.arc(p.x,p.y,half+5,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
-    ctx.restore();
+  // Flash message
+  if (state.flashTimer > 0) {
+    const a = Math.min(1, state.flashTimer / 25);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 15px Orbitron, monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = C.gold; ctx.shadowBlur = 16;
+    ctx.fillText(state.flash, canvas.width/2, canvas.height/2 - 20);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
   }
 
-  // Carried flag pennant
-  if(p.hasFlag){
-    const fc=p.team==='blue'?CLR.red:CLR.blue;
-    ctx.shadowColor=fc; ctx.shadowBlur=10; ctx.fillStyle=fc;
-    ctx.fillRect(p.x-1,p.y-half-13,2,13);
-    ctx.beginPath(); ctx.moveTo(p.x+1,p.y-half-13); ctx.lineTo(p.x+10,p.y-half-7); ctx.lineTo(p.x+1,p.y-half-1); ctx.closePath(); ctx.fill();
-  }
-
-  // Name label
-  ctx.shadowBlur=0;
-  const ly=p.y-half-(p.hasFlag?19:5);
-  ctx.font=(isMe?'bold ':'')+' 8px Share Tech Mono'; ctx.textAlign='center';
-  ctx.fillStyle='rgba(0,0,0,.7)'; ctx.fillText(p.name,p.x+1,ly+1);
-  ctx.fillStyle=isMe?'#fff':(p.team==='blue'?'#88eeff':'#ffaaaa');
-  ctx.fillText(p.name,p.x,ly);
-
-  ctx.restore();
+  // Tag range circle (always subtle around each player)
+  // done inline in drawPlayer
 }
 
-// ═══ GAME OVER ════════════════════════════════════════════════════
-function endGame() {
-  game.phase='over';
-  const winner = game.scoreBlue>game.scoreRed?'blue':game.scoreRed>game.scoreBlue?'red':'draw';
-  const el=(id)=>document.getElementById(id);
-  if(winner==='draw'){
-    el('over-title').style.color=CLR.gold; el('over-title').textContent='🏳 DRAW!';
-    el('over-winner').style.color=CLR.gold; el('over-winner').textContent='TIE GAME';
-  } else if(winner==='blue'){
-    el('over-title').style.color=CLR.blue; el('over-title').textContent='🔵 BLUE WINS!';
-    el('over-winner').style.color=CLR.blue; el('over-winner').textContent=game.players.blue.name;
+function flash(msg) { state.flash = msg; state.flashTimer = 90; }
+
+function updateTimerEl(s) {
+  const m = Math.floor(s/60), sec = s%60;
+  document.getElementById('timer').textContent = m+':'+(sec<10?'0':'')+sec;
+  if (s <= 30) document.getElementById('timer').style.color = '#ff4444';
+  else document.getElementById('timer').style.color = '';
+}
+
+function endGame(winner) {
+  state.over = true;
+  const box = document.getElementById('overlay-box');
+  let html = '';
+  if (winner==='draw') {
+    html = `<h2 style="color:var(--gold)">DRAW!</h2><div class="winner-msg" style="color:var(--gold)">🏳 TIE GAME</div>`;
   } else {
-    el('over-title').style.color=CLR.red; el('over-title').textContent='🔴 RED WINS!';
-    el('over-winner').style.color=CLR.red; el('over-winner').textContent=game.players.red.name;
+    const col = winner==='blue'?'var(--blue)':'var(--red)';
+    const emoji = winner==='blue'?'🔵':'🔴';
+    html = `<h2 style="color:${col}">${emoji} ${winner==='blue'?blueName:redName} WINS!</h2>
+            <div class="winner-msg" style="color:${col}">${winner==='blue'?state.scoreBlue:state.scoreRed} captures</div>`;
   }
-  el('over-score').textContent='Blue '+game.scoreBlue+' – Red '+game.scoreRed;
-  el('over-overlay').style.display='flex';
+  html += `<p style="margin-top:10px">Final — Blue: ${state.scoreBlue} · Red: ${state.scoreRed}</p>`;
+  html += `<button class="btn btn-blue" onclick="startGame()">⚡ PLAY AGAIN</button>`;
+  box.innerHTML = html;
+  document.getElementById('overlay').style.display = 'flex';
 }
 
-// ═══ LOOP ═════════════════════════════════════════════════════════
-let lastTs=0;
-const FRAME=1000/FPS;
+// ── Game loop ─────────────────────────────────────────────────────────────────
+let state = null;
+let loopId = null;
 
-function loop(ts) {
-  requestAnimationFrame(loop);
-  if(!game||game.phase!=='playing') return;
-  if(ts-lastTs>=FRAME){
-    lastTs=ts;
-    gameTick();
-    if(game.phase==='playing'){
-      renderView(ctxB,'blue');
-      renderView(ctxR,'red');
-    }
-  }
-}
-
-// ═══ UI ═══════════════════════════════════════════════════════════
 function startGame() {
-  const bn=document.getElementById('nick-blue').value.trim()||'BLUE';
-  const rn=document.getElementById('nick-red').value.trim()||'RED';
-  document.getElementById('home-overlay').style.display='none';
-  document.getElementById('name-blue').textContent=bn;
-  document.getElementById('name-red').textContent=rn;
-  document.getElementById('lbl-blue').textContent='🔵 '+bn;
-  document.getElementById('lbl-red').textContent='🔴 '+rn;
-  document.getElementById('score-blue').textContent='0';
-  document.getElementById('score-red').textContent='0';
-  game=makeGame(bn,rn);
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('blue-score').textContent = '0';
+  document.getElementById('red-score').textContent  = '0';
+  updateTimerEl(180);
+  resize();
+  state = makeState();
+  if (loopId) clearInterval(loopId);
+  loopId = setInterval(() => { update(); draw(); }, 1000/FPS);
 }
 
-function restartGame() {
-  const bn=game.players.blue.name, rn=game.players.red.name;
-  document.getElementById('over-overlay').style.display='none';
-  document.getElementById('score-blue').textContent='0';
-  document.getElementById('score-red').textContent='0';
-  document.getElementById('hud-time').textContent='3:00';
-  game=makeGame(bn,rn);
+// Start button in overlay already calls startGame()
+// Initial resize
+window.addEventListener('load', () => { resize(); });
+
+// ── Nicknames ─────────────────────────────────────────────────────────────────
+let blueName = 'BLUE';
+let redName  = 'RED';
+
+function enterGame() {
+  blueName = document.getElementById('nick-blue').value.trim() || 'BLUE';
+  redName  = document.getElementById('nick-red').value.trim()  || 'RED';
+  // Update the side panel headers
+  document.querySelector('.panel-box h3').textContent = '🔵 ' + blueName;
+  document.querySelectorAll('.panel-box h3')[1].textContent = '🔴 ' + redName;
+  // Update scoreboard labels
+  document.querySelector('.score-label').textContent = '🔵 ' + blueName;
+  document.querySelectorAll('.score-label')[2].textContent = '🔴 ' + redName;
+  // Update IT bar
+  document.getElementById('blue-it').textContent = '🔵 ' + blueName + ' — IT';
+  document.getElementById('red-it').textContent  = '🔴 ' + redName  + ' — IT';
+  document.getElementById('nick-overlay').style.display = 'none';
+  startGame();
 }
 
-function goHome() {
-  game=null;
-  document.getElementById('over-overlay').style.display='none';
-  document.getElementById('home-overlay').style.display='flex';
-}
-
-document.getElementById('nick-blue').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('nick-red').focus();});
-document.getElementById('nick-red').addEventListener('keydown',e=>{if(e.key==='Enter')startGame();});
+document.getElementById('nick-blue').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('nick-red').focus();
+});
+document.getElementById('nick-red').addEventListener('keydown', e => {
+  if (e.key === 'Enter') enterGame();
+});
 document.getElementById('nick-blue').focus();
 
-resizeCanvases();
-requestAnimationFrame(loop);
 </script>
 </body>
 </html>
