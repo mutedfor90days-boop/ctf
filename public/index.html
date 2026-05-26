@@ -129,8 +129,7 @@
     <div class="home-tagline">5v5 · MULTI-ROOM · REAL-TIME</div>
     <input id="nickname-input" type="text" maxlength="16" placeholder="ENTER NICKNAME" autocomplete="off" spellcheck="false" />
     <div id="nickname-error"></div>
-    <button class="btn-play" onclick="startMatchmaking()">▶ QUICK PLAY</button>
-    <button class="btn-play" style="background:linear-gradient(90deg,#1a4a1a,#0a2a0a);border:1px solid #00ff88;color:#00ff88;margin-top:6px" onclick="startQuickPlayBots()">&#129302; PLAY vs BOTS</button>
+    <button class="btn-play" onclick="startQuickPlayBots()">▶ QUICK PLAY</button>
 
     <div class="home-divider">OR</div>
 
@@ -438,7 +437,8 @@ function updateWaitCountdown(seconds) {
     lobbyEl.innerHTML = roomTag + `<b style="color:var(--gold)">⚡ GAME STARTING…</b>`;
     return;
   }
-  const bar = Math.round((seconds / 20) * 10);
+  const maxSecs = seconds > 10 ? 20 : 3;
+  const bar = Math.round((seconds / maxSecs) * 10);
   const filled = '█'.repeat(bar) + '░'.repeat(10 - bar);
   lobbyEl.innerHTML = roomTag +
     `<b style="color:var(--gold)">⚡ STARTING IN ${seconds}s</b><br>` +
@@ -502,7 +502,9 @@ function connect(roomCode, quickPlay) {
     }
 
     if (msg.type === 'waitStart') {
-      // 2+ players joined — 20s countdown before game starts
+      // countdown started — hide home screen, show overlay countdown
+      document.getElementById('home-screen').style.display = 'none';
+      document.getElementById('overlay').style.display = 'flex';
       updateWaitCountdown(msg.seconds);
     }
 
@@ -530,6 +532,7 @@ function connect(roomCode, quickPlay) {
 
     if (msg.type === 'phase' && msg.phase === 'playing') {
       document.getElementById('overlay').style.display = 'none';
+      document.getElementById('home-screen').style.display = 'none';
       gamePhase = 'playing';
     }
 
