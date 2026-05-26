@@ -284,6 +284,63 @@
 </div>
 
 <script>
+
+// ═══════════════════════════════════════════════════════════
+// SOUND ENGINE
+// ═══════════════════════════════════════════════════════════
+const SFX = (() => {
+  let ctx = null;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(freq, type, vol, attack, decay, t) {
+    const ac = getCtx();
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type; osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    osc.start(t); osc.stop(t + attack + decay + 0.01);
+  }
+  function sweep(f0, f1, type, vol, dur, t) {
+    const ac = getCtx();
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.start(t); osc.stop(t + dur + 0.01);
+  }
+  function noise(vol, dur, t) {
+    const ac = getCtx();
+    const buf = ac.createBuffer(1, ac.sampleRate * dur, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random()*2-1;
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const gain = ac.createGain();
+    const filt = ac.createBiquadFilter(); filt.type='bandpass'; filt.frequency.value=700;
+    src.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.start(t); src.stop(t + dur + 0.01);
+  }
+  return {
+    flagGrab()  { const ac=getCtx(),t=ac.currentTime; sweep(300,900,'sine',0.18,0.12,t); sweep(450,1100,'sine',0.10,0.10,t+0.04); tone(1200,'sine',0.12,0.01,0.18,t+0.12); },
+    capture()   { const ac=getCtx(),t=ac.currentTime; [523,659,784,1047].forEach((f,i)=>tone(f,'sine',0.22,0.01,i===3?0.35:0.12,t+i*0.13)); tone(1568,'sine',0.08,0.01,0.35,t+0.39); },
+    tagged()    { const ac=getCtx(),t=ac.currentTime; noise(0.25,0.08,t); sweep(400,80,'sawtooth',0.18,0.15,t); sweep(800,120,'square',0.08,0.12,t+0.02); },
+    flagReturn(){ const ac=getCtx(),t=ac.currentTime; sweep(600,300,'sine',0.12,0.20,t); tone(300,'sine',0.08,0.01,0.15,t+0.18); },
+    gameStart() { const ac=getCtx(),t=ac.currentTime; sweep(200,600,'sawtooth',0.10,0.08,t); [440,660,880].forEach((f,i)=>tone(f,'sine',0.18,0.01,0.18,t+0.08+i*0.13)); },
+    win()       { const ac=getCtx(),t=ac.currentTime; [523,659,784,659,1047].forEach((f,i)=>tone(f,'sine',0.22,0.01,0.18,t+i*0.13)); },
+    lose()      { const ac=getCtx(),t=ac.currentTime; [440,330,220].forEach((f,i)=>sweep(f,f/2,'sawtooth',0.14,0.20,t+i*0.22)); },
+    tick(final) { const ac=getCtx(),t=ac.currentTime; tone(final?1200:880,'sine',final?0.18:0.09,0.001,0.07,t); },
+  };
+})();
+
 // ── Canvas setup ──────────────────────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -762,17 +819,28 @@ function draw() {
   // done inline in drawPlayer
 }
 
-function flash(msg) { state.flash = msg; state.flashTimer = 90; }
+function flash(msg) {
+  state.flash = msg; state.flashTimer = 90;
+  if (msg.includes('grabbed'))  SFX.flagGrab();
+  else if (msg.includes('spawn'))    SFX.tagged();
+  else if (msg.includes('returned')) SFX.flagReturn();
+  else if (msg.includes('CAPTURES') || msg.includes('captures')) SFX.capture();
+}
 
 function updateTimerEl(s) {
   const m = Math.floor(s/60), sec = s%60;
   document.getElementById('timer').textContent = m+':'+(sec<10?'0':'')+sec;
   if (s <= 30) document.getElementById('timer').style.color = '#ff4444';
   else document.getElementById('timer').style.color = '';
+  if (s <= 10 && s > 0) SFX.tick(s <= 3);
 }
 
 function endGame(winner) {
   state.over = true;
+  setTimeout(() => {
+    if (winner === 'draw') SFX.lose();
+    else SFX.win();
+  }, 200);
   const box = document.getElementById('overlay-box');
   let html = '';
   if (winner==='draw') {
@@ -797,6 +865,7 @@ function startGame() {
   document.getElementById('overlay').style.display = 'none';
   document.getElementById('blue-score').textContent = '0';
   document.getElementById('red-score').textContent  = '0';
+  SFX.gameStart();
   updateTimerEl(180);
   resize();
   state = makeState();

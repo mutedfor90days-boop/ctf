@@ -122,6 +122,170 @@
 </div>
 
 <script>
+
+// ═══════════════════════════════════════════════════════════
+// SOUND ENGINE (Web Audio API — no files needed)
+// ═══════════════════════════════════════════════════════════
+const SFX = (() => {
+  let ctx = null;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function tone(freq, type, vol, attack, decay, startTime) {
+    const ac = getCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(vol, startTime + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + attack + decay);
+    osc.start(startTime);
+    osc.stop(startTime + attack + decay + 0.01);
+  }
+
+  function sweep(freqStart, freqEnd, type, vol, duration, startTime) {
+    const ac = getCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqStart, startTime);
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, startTime + duration);
+    gain.gain.setValueAtTime(vol, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.01);
+  }
+
+  function noise(vol, duration, startTime) {
+    const ac = getCtx();
+    const bufSize = ac.sampleRate * duration;
+    const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1);
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const gain = ac.createGain();
+    const filter = ac.createBiquadFilter();
+    filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5;
+    src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    gain.gain.setValueAtTime(vol, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    src.start(startTime); src.stop(startTime + duration + 0.01);
+  }
+
+  return {
+    flagGrab() {
+      // Rising sweep — exciting!
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(300, 900, 'sine', 0.18, 0.12, t);
+      sweep(450, 1100, 'sine', 0.10, 0.10, t + 0.04);
+      tone(1200, 'sine', 0.12, 0.01, 0.18, t + 0.12);
+    },
+    capture() {
+      // Triumphant 3-note fanfare
+      const ac = getCtx(), t = ac.currentTime;
+      tone(523, 'sine', 0.22, 0.01, 0.12, t);
+      tone(659, 'sine', 0.22, 0.01, 0.12, t + 0.12);
+      tone(784, 'sine', 0.25, 0.01, 0.30, t + 0.24);
+      tone(1047,'sine', 0.20, 0.01, 0.35, t + 0.30);
+      // Harmonic shimmer
+      tone(1568,'sine', 0.08, 0.01, 0.35, t + 0.30);
+    },
+    tagged() {
+      // Thud + zap
+      const ac = getCtx(), t = ac.currentTime;
+      noise(0.25, 0.08, t);
+      sweep(400, 80, 'sawtooth', 0.18, 0.15, t);
+      sweep(800, 120, 'square', 0.08, 0.12, t + 0.02);
+    },
+    flagReturn() {
+      // Soft descending — flag went home
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(600, 300, 'sine', 0.12, 0.20, t);
+      tone(300, 'sine', 0.08, 0.01, 0.15, t + 0.18);
+    },
+    gameStart() {
+      // Dramatic rising sting
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(200, 600, 'sawtooth', 0.10, 0.08, t);
+      tone(440, 'sine', 0.18, 0.01, 0.15, t + 0.08);
+      tone(660, 'sine', 0.18, 0.01, 0.15, t + 0.20);
+      tone(880, 'sine', 0.20, 0.01, 0.25, t + 0.32);
+    },
+    win() {
+      // 5-note victory
+      const ac = getCtx(), t = ac.currentTime;
+      const notes = [523, 659, 784, 659, 1047];
+      const times = [0,   0.13, 0.26, 0.39, 0.52];
+      notes.forEach((f, i) => tone(f, 'sine', 0.22, 0.01, 0.18, t + times[i]));
+    },
+    lose() {
+      // Descending wah-wah
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(440, 220, 'sawtooth', 0.15, 0.20, t);
+      sweep(330, 165, 'sawtooth', 0.12, 0.20, t + 0.22);
+      sweep(220, 110, 'sawtooth', 0.10, 0.25, t + 0.44);
+    },
+    tick() {
+      // Subtle countdown click
+      const ac = getCtx(), t = ac.currentTime;
+      tone(880, 'sine', 0.06, 0.001, 0.04, t);
+    },
+    countdownBeep(final) {
+      // Louder beep for final 3s
+      const ac = getCtx(), t = ac.currentTime;
+      tone(final ? 1200 : 880, 'sine', final ? 0.18 : 0.10, 0.001, 0.08, t);
+    },
+  };
+})();
+
+// track prev flash to detect new events
+let prevFlash = null;
+let prevScoreBlue = 0, prevScoreRed = 0;
+let prevTimeLeft = 9999;
+
+function detectSoundEvents(msg) {
+  if (msg.type === 'phase' && msg.phase === 'playing') {
+    SFX.gameStart();
+  }
+  if (msg.type === 'state') {
+    // Score — capture
+    if (msg.scoreBlue > prevScoreBlue || msg.scoreRed > prevScoreRed) {
+      const isMine = (myTeam === 'blue' && msg.scoreBlue > prevScoreBlue) ||
+                     (myTeam === 'red'  && msg.scoreRed  > prevScoreRed);
+      isMine ? SFX.win() : SFX.capture();
+    }
+    prevScoreBlue = msg.scoreBlue;
+    prevScoreRed  = msg.scoreRed;
+
+    // Flash message changes — detect events
+    if (msg.flash && msg.flash !== prevFlash) {
+      const f = msg.flash;
+      if (f.includes('grabbed')) SFX.flagGrab();
+      else if (f.includes('spawn')) SFX.tagged();
+      else if (f.includes('returned')) SFX.flagReturn();
+      prevFlash = f;
+    }
+
+    // Countdown ticks
+    if (msg.timeLeft !== prevTimeLeft) {
+      if (msg.timeLeft <= 10 && msg.timeLeft > 0) SFX.countdownBeep(msg.timeLeft <= 3);
+      else if (msg.timeLeft <= 30 && msg.timeLeft % 10 === 0) SFX.tick();
+      prevTimeLeft = msg.timeLeft;
+    }
+  }
+  if (msg.type === 'gameover') {
+    const iWin = msg.winner === myTeam;
+    setTimeout(() => iWin ? SFX.win() : SFX.lose(), 300);
+  }
+}
+
 // ── Config (must match server) ─────────────────────────────────────────────────
 const TILE        = 20;
 const PLAYER_SIZE = 18;
@@ -179,6 +343,7 @@ window.addEventListener('keydown', e => {
   keys[e.key] = true;
   if ((e.key === ' ' || e.key === 'f' || e.key === 'F') && ws && ws.readyState === 1) {
     ws.send(JSON.stringify({ type:'tag' }));
+    SFX.tagged(); // play immediately for responsiveness
   }
 });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
