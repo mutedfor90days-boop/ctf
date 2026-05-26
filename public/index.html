@@ -54,6 +54,29 @@
     padding:2px 14px;border:1px solid;pointer-events:none;}
   .mtb-blue{color:var(--blue);border-color:var(--blue);background:rgba(0,200,255,.08);}
   .mtb-red{color:var(--red);border-color:var(--red);background:rgba(255,34,68,.08);}
+  /* home screen */
+  #home-screen{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);}
+  #home-screen .hbox{background:linear-gradient(135deg,#060f1c,#030810);border:1px solid #1a2a3a;
+    box-shadow:0 0 60px rgba(0,200,255,.15);padding:40px 44px;text-align:center;max-width:440px;width:92vw;}
+  .home-title{font-family:'Orbitron',monospace;font-size:clamp(1rem,4vw,1.9rem);font-weight:900;
+    letter-spacing:.18em;background:linear-gradient(90deg,var(--blue),#fff 50%,var(--red));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    filter:drop-shadow(0 0 12px rgba(0,200,255,.4));margin-bottom:6px;}
+  .home-tagline{opacity:.4;font-size:.65rem;letter-spacing:.14em;margin-bottom:28px;}
+  #nickname-input{background:rgba(0,20,40,.8);border:1px solid #1a3a5a;color:#fff;
+    font-family:'Share Tech Mono',monospace;font-size:1rem;padding:11px 16px;width:100%;
+    text-align:center;outline:none;letter-spacing:.1em;margin-bottom:4px;transition:border-color .2s;}
+  #nickname-input:focus{border-color:var(--blue);box-shadow:0 0 14px rgba(0,200,255,.2);}
+  #nickname-input::placeholder{opacity:.3;}
+  #nickname-error{color:var(--red);font-size:.65rem;min-height:1.1em;margin-bottom:10px;}
+  .btn-play{background:linear-gradient(90deg,var(--blue),#0088dd);color:#000;font-size:.82rem;
+    padding:13px 36px;letter-spacing:.2em;box-shadow:0 0 24px rgba(0,200,255,.35);width:100%;
+    font-family:'Orbitron',monospace;font-weight:700;border:none;cursor:pointer;transition:all .15s;}
+  .btn-play:hover{background:linear-gradient(90deg,#fff,var(--blue));box-shadow:0 0 36px rgba(0,200,255,.6);}
+  .home-rules{font-size:.6rem;opacity:.35;line-height:1.95;margin-top:22px;}
+  .btn-local{background:rgba(255,34,68,.12);color:var(--red);border:1px solid var(--red);font-family:'Orbitron',monospace;font-size:.65rem;font-weight:700;letter-spacing:.14em;padding:9px 0;width:100%;cursor:pointer;transition:all .15s;margin-top:8px;}
+  .btn-local:hover{background:var(--red);color:#000;}
 </style>
 </head>
 <body>
@@ -67,6 +90,22 @@
   <canvas id="c"></canvas>
   <canvas id="minimap" width="160" height="100"></canvas>
   <div id="my-team-bar" style="display:none"></div>
+</div>
+<div id="home-screen">
+  <div class="hbox">
+    <div class="home-title">◈ CAPTURE THE FLAG ◈</div>
+    <div class="home-tagline">5v5 · MULTI-ROOM · REAL-TIME</div>
+    <input id="nickname-input" type="text" maxlength="16" placeholder="ENTER NICKNAME" autocomplete="off" spellcheck="false" />
+    <div id="nickname-error"></div>
+    <button class="btn-play" onclick="startMatchmaking()">▶ PLAY ONLINE</button>
+    <button class="btn-local" onclick="location.href='local2p.html'">⌨ LOCAL 2-PLAYER (SAME KEYBOARD)</button>
+    <div class="home-rules">
+      WASD / ARROWS to move &nbsp;·&nbsp; SPACE / F to tag<br>
+      Grab the enemy flag · return it to your base<br>
+      Tag enemies to send them back to spawn<br>
+      First to <b style="color:var(--gold)">5 captures</b> wins
+    </div>
+  </div>
 </div>
 <div id="overlay">
   <div class="obox" id="obox">
@@ -177,11 +216,16 @@ function updateWaitCountdown(seconds) {
     `<span style="opacity:.55;font-size:.65rem">More players can still join!</span>`;
 }
 
+
+function sendNickname() {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nickname', name: playerNickname }));
+}
+
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   ws = new WebSocket(`${proto}://${location.host}`);
 
-  ws.onopen = () => console.log('Connected');
+  ws.onopen = () => { console.log('Connected'); if (playerNickname) sendNickname(); };
 
   ws.onmessage = e => {
     const msg = JSON.parse(e.data);
@@ -276,7 +320,29 @@ function connect() {
   };
 }
 
-connect();
+// ── Home screen ───────────────────────────────────────────────────────────────
+let playerNickname = '';
+
+function startMatchmaking() {
+  const input = document.getElementById('nickname-input');
+  const errEl = document.getElementById('nickname-error');
+  const raw = input.value.trim().replace(/\s+/g, ' ');
+  if (!raw) { errEl.textContent = 'Please enter a nickname.'; input.focus(); return; }
+  if (raw.length < 2) { errEl.textContent = 'Too short — at least 2 characters.'; input.focus(); return; }
+  errEl.textContent = '';
+  playerNickname = raw.slice(0, 16);
+  document.getElementById('home-screen').style.display = 'none';
+  connect();
+}
+
+// Allow pressing Enter in nickname field
+document.getElementById('nickname-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startMatchmaking();
+});
+
+// Focus the input on load
+document.getElementById('nickname-input').focus();
+
 
 // ── HUD helpers ────────────────────────────────────────────────────────────────
 function updateRoleBadge() {
@@ -289,8 +355,9 @@ function updateRoleBadge() {
 function showTeamBar() {
   const bar = document.getElementById('my-team-bar');
   bar.style.display = 'block';
-  if (myTeam === 'blue') { bar.className='mtb-blue'; bar.textContent='YOU ARE 🔵 BLUE — Move: WASD · Tag: SPACE'; }
-  else if (myTeam === 'red')  { bar.className='mtb-red';  bar.textContent='YOU ARE 🔴 RED — Move: WASD · Tag: SPACE'; }
+  const nameTag = playerNickname ? playerNickname + ' · ' : '';
+  if (myTeam === 'blue') { bar.className='mtb-blue'; bar.textContent= nameTag + '🔵 BLUE — WASD · SPACE to tag'; }
+  else if (myTeam === 'red')  { bar.className='mtb-red';  bar.textContent= nameTag + '🔴 RED — WASD · SPACE to tag'; }
 }
 
 function updateTimerEl(s) {
@@ -434,11 +501,17 @@ function drawPlayer(p) {
     ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
   }
 
-  // Player label
-  ctx.fillStyle = isMe ? '#fff' : (p.team==='blue'?'#88eeff':'#ffaaaa');
-  ctx.font = isMe ? 'bold 8px Share Tech Mono' : '7px Share Tech Mono';
+  // Player label / nickname
+  const label = p.name ? p.name : (isMe ? 'YOU' : 'P' + (p.slotIndex != null ? p.slotIndex + 1 : ''));
+  const fontSize = isMe ? 9 : 8;
+  ctx.font = (isMe ? 'bold ' : '') + fontSize + 'px Share Tech Mono';
   ctx.textAlign = 'center';
-  ctx.fillText(isMe ? 'YOU' : 'P'+(p.slotIndex!=null?p.slotIndex+1:''), p.x, p.y-half-3);
+  // Draw a subtle shadow/outline for readability
+  const labelY = p.y - half - (p.hasFlag ? 18 : 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText(label, p.x + 1, labelY + 1);
+  ctx.fillStyle = isMe ? '#ffffff' : (p.team === 'blue' ? '#88eeff' : '#ffaaaa');
+  ctx.fillText(label, p.x, labelY);
 }
 
 function drawTagEffects() {

@@ -16,7 +16,8 @@ const COLS         = 80;
 const ROWS         = 50;
 const W            = COLS * TILE;
 const H            = ROWS * TILE;
-const SPEED        = 2.8;
+const SPEED        = 3.8;   // speed without flag
+const SPEED_FLAG   = 2.8;   // speed while carrying the flag
 const PLAYER_SIZE  = 18;
 const TAG_RANGE    = 40;
 const TAG_COOLDOWN = 70;
@@ -113,6 +114,7 @@ function makePlayer(team, slotIndex, room) {
   return {
     id: nextPlayerId++,
     team, slotIndex,
+    name: null,
     x: sp.x, y: sp.y,
     spawnX: sp.x, spawnY: sp.y,
     hasFlag: false,
@@ -169,6 +171,7 @@ function broadcastLobby(room) {
     red: countTeam(room, 'red'),
     need: TEAM_SIZE,
     roomId: room.id,
+    name: p.name,
   });
 }
 
@@ -292,7 +295,7 @@ function tick(room) {
 
   broadcastRoom(room, {
     type: 'state',
-    players: players.map(p => ({ id:p.id, team:p.team, x:p.x, y:p.y, hasFlag:p.hasFlag, tagCooldown:p.tagCooldown })),
+    players: players.map(p => ({ id:p.id, team:p.team, name:p.name, x:p.x, y:p.y, hasFlag:p.hasFlag, tagCooldown:p.tagCooldown })),
     blueFlag: { x:bf.x, y:bf.y, carriedBy:bf.carriedBy, home:bf.home, returnTimer:bf.returnTimer },
     redFlag:  { x:rf.x, y:rf.y, carriedBy:rf.carriedBy, home:rf.home, returnTimer:rf.returnTimer },
     scoreBlue: game.scoreBlue, scoreRed: game.scoreRed,
@@ -306,10 +309,11 @@ function tick(room) {
 function movePlayer(p) {
   const k = p.keys;
   let dx=0, dy=0;
-  if (k.up)    dy -= SPEED;
-  if (k.down)  dy += SPEED;
-  if (k.left)  dx -= SPEED;
-  if (k.right) dx += SPEED;
+  const spd = p.hasFlag ? SPEED_FLAG : SPEED;
+  if (k.up)    dy -= spd;
+  if (k.down)  dy += spd;
+  if (k.left)  dx -= spd;
+  if (k.right) dx += spd;
   if (dx && dy) { dx *= 0.707; dy *= 0.707; }
   const half = PLAYER_SIZE / 2;
   const nx = Math.max(half, Math.min(W - half, p.x + dx));
@@ -342,7 +346,7 @@ function doTag(room, attacker) {
   setFlash(game, '💥 ' + teamLabel(closest.team, closest) + ' sent back to spawn!');
 }
 
-function teamLabel(team, p) { return team.toUpperCase() + ' P' + (p.slotIndex + 1); }
+function teamLabel(team, p) { return p.name || (team.toUpperCase() + ' P' + (p.slotIndex + 1)); }
 function setFlash(game, msg) { game.flash = msg; game.flashTimer = 100; }
 
 function endGame(room, winner) {
@@ -419,6 +423,7 @@ wss.on('connection', ws => {
     timeLeft: game.timeLeft,
     maxScore: MAX_SCORE,
     roomId: room.id,
+    name: p.name,
   });
 
   broadcastLobby(room);
@@ -442,6 +447,9 @@ wss.on('connection', ws => {
       player.keys.right = !!msg.right;
     }
     if (msg.type === 'tag') player.tagPressed = true;
+    if (msg.type === 'nickname' && typeof msg.name === 'string') {
+      player.name = msg.name.trim().slice(0, 16) || null;
+    }
     if (msg.type === 'restart' && game.phase === 'over') {
       resetRoom(room);
       broadcastLobby(room);
