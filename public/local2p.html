@@ -439,7 +439,9 @@ function endGame() {
 // ═══════════════════════════════════════════════════════════════════
 function renderView(ctx, focusPlayer) {
   const vw = ctx.canvas.width, vh = ctx.canvas.height;
+  if (vw === 0 || vh === 0) return;
   const fp = game.players[focusPlayer];
+  if (!fp) return;
   const camX = Math.max(0, Math.min(W-vw, fp.x - vw/2));
   const camY = Math.max(0, Math.min(H-vh, fp.y - vh/2));
 
@@ -488,79 +490,102 @@ function renderView(ctx, focusPlayer) {
 
   // Tag effects
   game.tagEffects.forEach(e => {
+    ctx.save();
     ctx.strokeStyle=e.color; ctx.lineWidth=2;
     ctx.globalAlpha=Math.max(0,e.life/40)*0.7;
     ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.stroke();
-    ctx.globalAlpha=1;
+    ctx.restore();
   });
 
   // Tag range hint for focus player
+  ctx.save();
   ctx.strokeStyle=CLR.gold; ctx.lineWidth=1; ctx.globalAlpha=0.1;
   ctx.setLineDash([4,4]);
   ctx.beginPath(); ctx.arc(fp.x,fp.y,TAG_RANGE,0,Math.PI*2); ctx.stroke();
-  ctx.setLineDash([]); ctx.globalAlpha=1;
+  ctx.restore();
 
   // Draw both players
-  drawPlayerOnCtx(ctx, game.players.blue, fp);
-  drawPlayerOnCtx(ctx, game.players.red,  fp);
+  drawPlayerOnCtx(ctx, game.players.blue, focusPlayer);
+  drawPlayerOnCtx(ctx, game.players.red,  focusPlayer);
 
   ctx.restore();
 }
 
 function drawFlagOnCtx(ctx, flag, col) {
-  if (flag.carriedBy !== null) return; // drawn with player
-  ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 14; ctx.globalAlpha = flag.home ? 1 : 0.6;
+  if (flag.carriedBy !== null) return;
+  ctx.save();
+  ctx.shadowColor = col; ctx.shadowBlur = 14;
+  ctx.globalAlpha = flag.home ? 1 : 0.6;
+  ctx.fillStyle   = col;
   ctx.beginPath(); ctx.arc(flag.x, flag.y, 7, 0, Math.PI*2); ctx.fill();
   if (!flag.home) {
-    // return timer bar
-    const frac = flag.returnTimer / FLAG_RETURN;
+    const frac = Math.max(0, flag.returnTimer / FLAG_RETURN);
+    ctx.shadowBlur=0; ctx.globalAlpha=1;
     ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(flag.x-14, flag.y+10, 28, 3);
     ctx.fillStyle=col; ctx.fillRect(flag.x-14, flag.y+10, 28*frac, 3);
   }
-  ctx.shadowBlur=0; ctx.globalAlpha=1;
+  ctx.restore();
 }
 
-function drawPlayerOnCtx(ctx, p, focusP) {
-  const isMe = p === focusP;
+function drawPlayerOnCtx(ctx, p, focusTeam) {
+  const isMe = p.team === focusTeam;
   const col  = p.team === 'blue' ? CLR.blue : CLR.red;
   const dark = p.team === 'blue' ? CLR.blueDark : CLR.redDark;
   const half = PLAYER_SIZE/2;
 
-  ctx.shadowColor=col; ctx.shadowBlur=isMe?20:8;
-  ctx.fillStyle=col; ctx.fillRect(p.x-half, p.y-half, PLAYER_SIZE, PLAYER_SIZE);
-  ctx.shadowBlur=0;
-  ctx.fillStyle=dark; ctx.fillRect(p.x-half+3, p.y-half+3, PLAYER_SIZE-6, PLAYER_SIZE-6);
-  if (isMe) { ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(p.x-half-2,p.y-half-2,PLAYER_SIZE+4,PLAYER_SIZE+4); }
+  ctx.save();
+  ctx.shadowColor = col;
+  ctx.shadowBlur  = isMe ? 20 : 8;
+  ctx.fillStyle   = col;
+  ctx.fillRect(p.x-half, p.y-half, PLAYER_SIZE, PLAYER_SIZE);
+  ctx.shadowBlur  = 0;
+  ctx.fillStyle   = dark;
+  ctx.fillRect(p.x-half+3, p.y-half+3, PLAYER_SIZE-6, PLAYER_SIZE-6);
+  if (isMe) {
+    ctx.strokeStyle='#fff'; ctx.lineWidth=1.5;
+    ctx.strokeRect(p.x-half-2, p.y-half-2, PLAYER_SIZE+4, PLAYER_SIZE+4);
+  }
 
   // Eyes
   ctx.fillStyle='#fff';
-  ctx.fillRect(p.x-4,p.y-3,3,3);
-  ctx.fillRect(p.x+1,p.y-3,3,3);
+  ctx.fillRect(p.x-4, p.y-3, 3, 3);
+  ctx.fillRect(p.x+1, p.y-3, 3, 3);
 
   // Cooldown arc
   if (p.tagCooldown > 0) {
     const frac = 1 - p.tagCooldown/TAG_COOLDOWN;
     ctx.strokeStyle=CLR.gold; ctx.lineWidth=2; ctx.globalAlpha=0.6;
-    ctx.beginPath(); ctx.arc(p.x,p.y,half+5,-Math.PI/2,-Math.PI/2+frac*Math.PI*2); ctx.stroke();
-    ctx.globalAlpha=1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, half+5, -Math.PI/2, -Math.PI/2 + frac*Math.PI*2);
+    ctx.stroke();
   }
 
-  // Flag
+  // Carried flag (pole + pennant)
   if (p.hasFlag) {
     const fc = p.team==='blue' ? CLR.red : CLR.blue;
-    ctx.fillStyle=fc; ctx.shadowColor=fc; ctx.shadowBlur=10;
+    ctx.globalAlpha=1;
+    ctx.shadowColor=fc; ctx.shadowBlur=10;
+    ctx.fillStyle=fc;
     ctx.fillRect(p.x-1, p.y-half-14, 2, 14);
-    ctx.beginPath(); ctx.moveTo(p.x+1,p.y-half-14); ctx.lineTo(p.x+10,p.y-half-8); ctx.lineTo(p.x+1,p.y-half-2);
-    ctx.closePath(); ctx.fill(); ctx.shadowBlur=0;
+    ctx.beginPath();
+    ctx.moveTo(p.x+1, p.y-half-14);
+    ctx.lineTo(p.x+10, p.y-half-8);
+    ctx.lineTo(p.x+1,  p.y-half-2);
+    ctx.closePath();
+    ctx.fill();
   }
 
-  // Name
+  // Name label
+  ctx.shadowBlur=0; ctx.globalAlpha=1;
   const labelY = p.y - half - (p.hasFlag ? 20 : 5);
   ctx.font = (isMe ? 'bold ' : '') + '8px Share Tech Mono';
   ctx.textAlign='center';
-  ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillText(p.name, p.x+1, labelY+1);
-  ctx.fillStyle = isMe ? '#fff' : (p.team==='blue'?'#88eeff':'#ffaaaa');
+  ctx.fillStyle='rgba(0,0,0,.6)';
+  ctx.fillText(p.name, p.x+1, labelY+1);
+  ctx.fillStyle = isMe ? '#fff' : (p.team==='blue' ? '#88eeff' : '#ffaaaa');
   ctx.fillText(p.name, p.x, labelY);
+
+  ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -571,19 +596,14 @@ const tickInterval = 1000/FPS;
 
 function loop(ts) {
   requestAnimationFrame(loop);
-  if (!game || game.phase !== 'playing') {
-    // Still render last frame if over
-    if (game) {
-      renderView(ctxB, 'blue');
-      renderView(ctxR, 'red');
-    }
-    return;
-  }
+  if (!game || game.phase !== 'playing') return;
   if (ts - lastTick >= tickInterval) {
     lastTick = ts;
     gameTick();
-    renderView(ctxB, 'blue');
-    renderView(ctxR, 'red');
+    if (game.phase === 'playing') {
+      renderView(ctxB, 'blue');
+      renderView(ctxR, 'red');
+    }
   }
 }
 
