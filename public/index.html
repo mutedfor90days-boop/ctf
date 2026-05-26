@@ -639,6 +639,7 @@ function startMatchmaking() {
   if (raw.length < 2) { errEl.textContent = 'Too short — at least 2 characters.'; input.focus(); return; }
   errEl.textContent = '';
   playerNickname = raw.slice(0, 16);
+  pendingRoomCode = null; // Quick Play — don't join a private room
   document.getElementById('home-screen').style.display = 'none';
   connect();
 }
