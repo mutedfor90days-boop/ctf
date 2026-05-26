@@ -77,6 +77,38 @@
   .home-rules{font-size:.6rem;opacity:.35;line-height:1.95;margin-top:22px;}
   .btn-local{background:rgba(255,34,68,.12);color:var(--red);border:1px solid var(--red);font-family:'Orbitron',monospace;font-size:.65rem;font-weight:700;letter-spacing:.14em;padding:9px 0;width:100%;cursor:pointer;transition:all .15s;margin-top:8px;}
   .btn-local:hover{background:var(--red);color:#000;}
+
+  /* private room UI */
+  .home-divider{display:flex;align-items:center;gap:10px;margin:14px 0;opacity:.3;font-size:.6rem;letter-spacing:.1em;}
+  .home-divider::before,.home-divider::after{content:'';flex:1;height:1px;background:#1a3a5a;}
+  .btn-private{background:rgba(255,215,0,.1);color:var(--gold);border:1px solid var(--gold);
+    font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;letter-spacing:.14em;
+    padding:11px 0;width:100%;cursor:pointer;transition:all .15s;}
+  .btn-private:hover{background:var(--gold);color:#000;}
+  #room-panel{margin-top:10px;display:none;flex-direction:column;gap:8px;}
+  #room-panel.visible{display:flex;}
+  .room-tabs{display:flex;gap:0;}
+  .rtab{flex:1;padding:8px;font-family:'Orbitron',monospace;font-size:.6rem;letter-spacing:.1em;
+    background:rgba(0,20,40,.6);border:1px solid #1a3a5a;cursor:pointer;transition:all .15s;text-align:center;}
+  .rtab.active{background:rgba(0,200,255,.15);border-color:var(--blue);color:var(--blue);}
+  .rtab:first-child{border-right:none;}
+  #room-create-view,#room-join-view{display:none;flex-direction:column;gap:8px;}
+  #room-create-view.visible,#room-join-view.visible{display:flex;}
+  .code-display{background:rgba(0,200,255,.07);border:1px solid var(--blue);padding:14px;text-align:center;display:none;}
+  .code-display.visible{display:block;}
+  .code-val{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:900;color:var(--blue);
+    letter-spacing:.15em;text-shadow:0 0 12px var(--blue);}
+  .code-link{font-size:.58rem;opacity:.45;margin-top:4px;word-break:break-all;}
+  .copy-btn{font-size:.58rem;background:rgba(0,200,255,.15);color:var(--blue);border:1px solid var(--blue);
+    padding:4px 12px;cursor:pointer;font-family:'Share Tech Mono',monospace;margin-top:6px;}
+  .copy-btn:hover{background:var(--blue);color:#000;}
+  #join-code-input{background:rgba(0,20,40,.8);border:1px solid #1a3a5a;color:#fff;
+    font-family:'Orbitron',monospace;font-size:.95rem;padding:10px 14px;width:100%;
+    text-align:center;outline:none;letter-spacing:.2em;transition:border-color .2s;text-transform:uppercase;}
+  #join-code-input:focus{border-color:var(--blue);box-shadow:0 0 10px rgba(0,200,255,.2);}
+  #join-code-input::placeholder{opacity:.28;font-size:.7rem;letter-spacing:.1em;}
+  #room-error{color:var(--red);font-size:.62rem;min-height:1em;text-align:center;}
+
 </style>
 </head>
 <body>
@@ -97,7 +129,37 @@
     <div class="home-tagline">5v5 · MULTI-ROOM · REAL-TIME</div>
     <input id="nickname-input" type="text" maxlength="16" placeholder="ENTER NICKNAME" autocomplete="off" spellcheck="false" />
     <div id="nickname-error"></div>
-    <button class="btn-play" onclick="startMatchmaking()">▶ PLAY ONLINE</button>
+    <button class="btn-play" onclick="startMatchmaking()">▶ QUICK PLAY</button>
+
+    <div class="home-divider">OR</div>
+
+    <button class="btn-private" onclick="toggleRoomPanel()">⚡ PRIVATE ROOM</button>
+
+    <div id="room-panel">
+      <div class="room-tabs">
+        <div class="rtab active" id="tab-create" onclick="switchTab('create')">CREATE</div>
+        <div class="rtab" id="tab-join" onclick="switchTab('join')">JOIN</div>
+      </div>
+
+      <div id="room-create-view" class="visible">
+        <button class="btn-play" style="background:linear-gradient(90deg,#005a8a,#003a5a);font-size:.72rem" onclick="createPrivateRoom()">⚡ CREATE ROOM</button>
+        <div class="code-display" id="code-display">
+          <div style="font-size:.55rem;opacity:.5;letter-spacing:.12em;margin-bottom:6px">YOUR ROOM CODE</div>
+          <div class="code-val" id="code-val"></div>
+          <div class="code-link" id="code-link"></div>
+          <button class="copy-btn" onclick="copyRoomLink()">📋 COPY INVITE LINK</button>
+        </div>
+      </div>
+
+      <div id="room-join-view">
+        <input id="join-code-input" type="text" maxlength="20" placeholder="ENTER ROOM CODE" autocomplete="off" spellcheck="false">
+        <button class="btn-play" style="font-size:.72rem" onclick="joinPrivateRoom()">→ JOIN ROOM</button>
+      </div>
+
+      <div id="room-error"></div>
+    </div>
+
+    <div class="home-divider" style="margin-top:14px"></div>
     <button class="btn-local" onclick="location.href='local2p.html'">⌨ LOCAL 2-PLAYER (SAME KEYBOARD)</button>
     <div class="home-rules">
       WASD / ARROWS to move &nbsp;·&nbsp; SPACE / F to tag<br>
@@ -364,6 +426,7 @@ setInterval(sendKeys, 1000/FPS);
 // ── WebSocket ──────────────────────────────────────────────────────────────────
 let ws;
 let currentRoomId = null;
+let currentRoomCode = null;
 
 function updateWaitCountdown(seconds) {
   const lobbyEl = document.getElementById('lobby-info');
@@ -404,6 +467,7 @@ function connect() {
       blueSpawns = msg.blueSpawns; redSpawns = msg.redSpawns;
       maxScore = msg.maxScore || 5;
       if (msg.roomId) currentRoomId = msg.roomId;
+      if (msg.roomCode) currentRoomCode = msg.roomCode;
       resizeCanvas();
       updateRoleBadge();
       showTeamBar();
@@ -418,7 +482,8 @@ function connect() {
 
     if (msg.type === 'lobby') {
       const need = msg.need;
-      const roomTag = msg.roomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${msg.roomId}</span><br>` : '';
+      const roomCodeTag = currentRoomCode ? `<span style="font-family:'Orbitron',monospace;font-size:.6rem;color:var(--gold);letter-spacing:.1em">${currentRoomCode}</span><br>` : (msg.roomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${msg.roomId}</span><br>` : '');
+      const roomTag = roomCodeTag;
       document.getElementById('lobby-info').innerHTML =
         roomTag +
         `<span class="lb">🔵 Blue: ${msg.blue}/${need}</span> &nbsp; <span class="lr">🔴 Red: ${msg.red}/${need}</span><br>
@@ -432,6 +497,14 @@ function connect() {
 
     if (msg.type === 'waitTick') {
       updateWaitCountdown(msg.seconds);
+    }
+
+    if (msg.type === 'error') {
+      // Server sent an error (e.g. room not found)
+      document.getElementById('home-screen').style.display = 'flex';
+      document.getElementById('room-error').textContent = msg.msg;
+      ws.close();
+      return;
     }
 
     if (msg.type === 'waitCancelled') {
@@ -484,6 +557,76 @@ function connect() {
     document.getElementById('overlay').style.display = 'flex';
   };
 }
+
+
+// ── Private room UI ────────────────────────────────────────────────────────────
+let privateRoomCode = null;
+let pendingRoomCode = null; // code to join when matchmaking starts
+
+function toggleRoomPanel() {
+  const panel = document.getElementById('room-panel');
+  panel.classList.toggle('visible');
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-create').classList.toggle('active', tab==='create');
+  document.getElementById('tab-join').classList.toggle('active', tab==='join');
+  document.getElementById('room-create-view').classList.toggle('visible', tab==='create');
+  document.getElementById('room-join-view').classList.toggle('visible', tab==='join');
+  document.getElementById('room-error').textContent = '';
+}
+
+async function createPrivateRoom() {
+  document.getElementById('room-error').textContent = '';
+  try {
+    const res = await fetch('/api/rooms/create', { method: 'POST' });
+    const data = await res.json();
+    privateRoomCode = data.code;
+    pendingRoomCode = data.code;
+    const display = document.getElementById('code-display');
+    display.classList.add('visible');
+    document.getElementById('code-val').textContent = data.code;
+    const link = window.location.origin + '/?room=' + data.code;
+    document.getElementById('code-link').textContent = link;
+  } catch(e) {
+    document.getElementById('room-error').textContent = 'Failed to create room. Try again.';
+  }
+}
+
+function copyRoomLink() {
+  if (!privateRoomCode) return;
+  const link = window.location.origin + '/?room=' + privateRoomCode;
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ COPIED!';
+    setTimeout(() => btn.textContent = '📋 COPY INVITE LINK', 2000);
+  });
+}
+
+function joinPrivateRoom() {
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  if (!code) { document.getElementById('room-error').textContent = 'Enter a room code.'; return; }
+  pendingRoomCode = code;
+  startMatchmaking();
+}
+
+// Read ?room= from URL on page load and auto-populate join field
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('room');
+  if (code) {
+    pendingRoomCode = code.toUpperCase();
+    // Show the join UI pre-filled
+    const panel = document.getElementById('room-panel');
+    panel.classList.add('visible');
+    switchTab('join');
+    document.getElementById('join-code-input').value = pendingRoomCode;
+  }
+})();
+
+document.getElementById('join-code-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') joinPrivateRoom();
+});
 
 // ── Home screen ───────────────────────────────────────────────────────────────
 let playerNickname = '';

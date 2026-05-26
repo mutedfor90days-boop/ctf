@@ -79,17 +79,52 @@ const RED_BASE    = { x: W - TILE*2, y: H/2 };
 // ── Multi-queue state ──────────────────────────────────────────────────────────
 // Each room: { id, game, gameLoop, clients: Map<ws, {playerId,team,slotIndex}>, nextId, startTimer, startCountdown }
 const rooms = new Map(); // roomId -> room
+
+// ── Room codes ─────────────────────────────────────────────────────────────────
+const ADJECTIVES = ['ALPHA','BRAVO','CYBER','DELTA','EMBER','FLARE','GHOST','HYPER',
+  'INFRA','JADE','KINETIC','LUNAR','MATRIX','NEON','ONYX','PIXEL','QUASAR','RAPID',
+  'SIGMA','TITAN','ULTRA','VIPER','WAVE','XENON','YETI','ZETA'];
+const NOUNS = ['ACE','BOLT','COMET','DART','ECHO','FANG','GRID','HAWK',
+  'ION','JAB','KITE','LANCE','MACH','NODE','ORB','PIKE','QUILL','RIFT',
+  'SPARK','THORN','UNIT','VOLT','WARP','XRAY','YARN','ZONE'];
+
+function makeCode() {
+  const a = ADJECTIVES[Math.floor(Math.random()*ADJECTIVES.length)];
+  const n = NOUNS[Math.floor(Math.random()*NOUNS.length)];
+  const d = Math.floor(Math.random()*90)+10; // 10-99
+  return a+'-'+n+'-'+d;
+}
+
+const roomsByCode = new Map(); // code -> room
+
+function createPrivateRoom() {
+  let code;
+  // ensure unique code
+  do { code = makeCode(); } while (roomsByCode.has(code));
+  const id = nextRoomId++;
+  const room = makeRoom(id);
+  room.game = makeGame();
+  room.code = code;
+  room.isPrivate = true;
+  rooms.set(id, room);
+  roomsByCode.set(code, room);
+  console.log(`Created private room ${id} with code ${code}`);
+  return room;
+}
+
 let nextRoomId = 1;
 let nextPlayerId = 1;
 
 function makeRoom(id) {
   return {
     id,
+    code: null,       // set for private rooms
+    isPrivate: false,
     game: null,
     gameLoop: null,
     clients: new Map(),
-    startTimer: null,      // the setTimeout handle for 20s wait
-    startCountdown: null,  // the setInterval handle ticking the countdown
+    startTimer: null,
+    startCountdown: null,
     waitSecondsLeft: 0,
   };
 }
@@ -358,7 +393,8 @@ function endGame(room, winner) {
 // Find a waiting room that has space, or create a new one
 function findOrCreateRoom() {
   for (const [id, room] of rooms) {
-    if (room.game.phase === 'waiting' &&
+    if (!room.isPrivate &&
+        room.game.phase === 'waiting' &&
         countTeam(room, 'blue') < TEAM_SIZE &&
         countTeam(room, 'red') < TEAM_SIZE) {
       return room;
@@ -380,13 +416,33 @@ function cleanupRoom(room) {
     if (room.startTimer)     clearTimeout(room.startTimer);
     if (room.startCountdown) clearInterval(room.startCountdown);
     rooms.delete(room.id);
+    if (room.code) roomsByCode.delete(room.code);
     console.log(`Removed empty room ${room.id}`);
   }
 }
 
 // ── WebSocket ──────────────────────────────────────────────────────────────────
-wss.on('connection', ws => {
-  const room = findOrCreateRoom();
+wss.on('connection', (ws, req) => {
+  // Parse room code from query string (?room=CODE)
+  const urlParams = new URL(req.url, 'http://localhost').searchParams;
+  const codeParam = (urlParams.get('room') || '').toUpperCase().trim();
+
+  let room;
+  if (codeParam) {
+    room = roomsByCode.get(codeParam);
+    if (!room) {
+      sendTo(ws, { type: 'error', code: 'ROOM_NOT_FOUND', msg: 'Room code not found. It may have expired.' });
+      ws.close();
+      return;
+    }
+    if (room.game.phase === 'over') {
+      sendTo(ws, { type: 'error', code: 'ROOM_OVER', msg: 'That game has already ended.' });
+      ws.close();
+      return;
+    }
+  } else {
+    room = findOrCreateRoom();
+  }
   const game = room.game;
 
   const bc = countTeam(room, 'blue'), rc = countTeam(room, 'red');
@@ -422,6 +478,7 @@ wss.on('connection', ws => {
     timeLeft: game.timeLeft,
     maxScore: MAX_SCORE,
     roomId: room.id,
+    roomCode: room.code || null,
     name: p.name,
   });
 
@@ -480,11 +537,19 @@ wss.on('connection', ws => {
 });
 
 // ── Broadcast server-wide room list (for lobby screen) ────────────────────────
+// Create a private room, return its code
+app.post('/api/rooms/create', (req, res) => {
+  const room = createPrivateRoom();
+  res.json({ code: room.code, roomId: room.id });
+});
+
 app.get('/api/rooms', (req, res) => {
   const list = [];
   for (const [id, room] of rooms) {
     list.push({
       id,
+      code: room.code || null,
+      isPrivate: room.isPrivate,
       phase: room.game.phase,
       blue: countTeam(room, 'blue'),
       red: countTeam(room, 'red'),
