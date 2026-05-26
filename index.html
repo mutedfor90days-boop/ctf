@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTF 5v5</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+  :root {
+    --bg:#06090f; --blue:#00cfff; --red:#ff2244; --gold:#ffd700; --green:#00ff88;
+    --panel:rgba(0,12,28,0.92); --dim:#1a2a3a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:#fff;font-family:'Share Tech Mono',monospace;
+    display:flex;flex-direction:column;align-items:center;height:100vh;overflow:hidden;user-select:none;}
+  header{text-align:center;padding:8px 0 3px;flex-shrink:0;}
+  header h1{font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(.9rem,3vw,1.8rem);
+    letter-spacing:.2em;background:linear-gradient(90deg,var(--blue),#fff 50%,var(--red));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    filter:drop-shadow(0 0 8px rgba(0,200,255,.3));}
+  #hud{display:flex;gap:24px;padding:3px 0 5px;flex-shrink:0;align-items:center;}
+  .score-block{display:flex;flex-direction:column;align-items:center;gap:1px;}
+  .score-label{opacity:.5;font-size:.6rem;letter-spacing:.15em;}
+  .score-val{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;}
+  .blue-val{color:var(--blue);text-shadow:0 0 8px var(--blue);}
+  .red-val{color:var(--red);text-shadow:0 0 8px var(--red);}
+  .time-val{color:var(--gold);text-shadow:0 0 8px var(--gold);}
+  #game-area{position:relative;flex:1;min-height:0;display:flex;justify-content:center;align-items:center;}
+  canvas#c{border:1px solid #142030;box-shadow:0 0 30px rgba(0,200,255,.08);display:block;}
+  /* minimap */
+  #minimap{position:absolute;bottom:8px;right:8px;border:1px solid #1a3a5a;background:rgba(0,5,15,.85);}
+  /* overlay */
+  #overlay{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;
+    background:rgba(0,4,12,.93);backdrop-filter:blur(6px);}
+  .obox{background:linear-gradient(135deg,#060f1c,#030810);border:1px solid #1a2a3a;
+    box-shadow:0 0 60px rgba(0,200,255,.12);padding:36px 44px;text-align:center;max-width:460px;width:92vw;}
+  .obox h2{font-family:'Orbitron',monospace;font-size:1.3rem;font-weight:900;letter-spacing:.18em;margin-bottom:8px;}
+  .obox p{opacity:.65;font-size:.75rem;line-height:1.85;margin-bottom:12px;}
+  .winner-msg{font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:900;margin:12px 0;}
+  .btn{font-family:'Orbitron',monospace;font-size:.72rem;font-weight:700;letter-spacing:.12em;
+    border:none;cursor:pointer;padding:10px 26px;margin:4px;transition:all .15s;}
+  .btn-blue{background:var(--blue);color:#000;box-shadow:0 0 16px rgba(0,200,255,.4);}
+  .btn-blue:hover{background:#fff;}
+  #lobby-info{font-size:.8rem;line-height:1.9;margin:12px 0;}
+  .lb{color:var(--blue);} .lr{color:var(--red);}
+  #role-badge{font-family:'Orbitron',monospace;font-size:.7rem;letter-spacing:.1em;padding:4px 12px;
+    border:1px solid;margin-bottom:10px;display:inline-block;}
+  .rb-blue{color:var(--blue);border-color:var(--blue);}
+  .rb-red{color:var(--red);border-color:var(--red);}
+  .rb-spec{color:#888;border-color:#333;}
+  #controls{font-size:.65rem;opacity:.55;margin-top:10px;line-height:1.7;}
+  #my-team-bar{position:absolute;top:6px;left:50%;transform:translateX(-50%);
+    font-family:'Orbitron',monospace;font-size:.6rem;letter-spacing:.1em;
+    padding:2px 14px;border:1px solid;pointer-events:none;}
+  .mtb-blue{color:var(--blue);border-color:var(--blue);background:rgba(0,200,255,.08);}
+  .mtb-red{color:var(--red);border-color:var(--red);background:rgba(255,34,68,.08);}
+  /* home screen */
+  #home-screen{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);}
+  #home-screen .hbox{background:linear-gradient(135deg,#060f1c,#030810);border:1px solid #1a2a3a;
+    box-shadow:0 0 60px rgba(0,200,255,.15);padding:40px 44px;text-align:center;max-width:440px;width:92vw;}
+  .home-title{font-family:'Orbitron',monospace;font-size:clamp(1rem,4vw,1.9rem);font-weight:900;
+    letter-spacing:.18em;background:linear-gradient(90deg,var(--blue),#fff 50%,var(--red));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    filter:drop-shadow(0 0 12px rgba(0,200,255,.4));margin-bottom:6px;}
+  .home-tagline{opacity:.4;font-size:.65rem;letter-spacing:.14em;margin-bottom:28px;}
+  #nickname-input{background:rgba(0,20,40,.8);border:1px solid #1a3a5a;color:#fff;
+    font-family:'Share Tech Mono',monospace;font-size:1rem;padding:11px 16px;width:100%;
+    text-align:center;outline:none;letter-spacing:.1em;margin-bottom:4px;transition:border-color .2s;}
+  #nickname-input:focus{border-color:var(--blue);box-shadow:0 0 14px rgba(0,200,255,.2);}
+  #nickname-input::placeholder{opacity:.3;}
+  #nickname-error{color:var(--red);font-size:.65rem;min-height:1.1em;margin-bottom:10px;}
+  .btn-play{background:linear-gradient(90deg,var(--blue),#0088dd);color:#000;font-size:.82rem;
+    padding:13px 36px;letter-spacing:.2em;box-shadow:0 0 24px rgba(0,200,255,.35);width:100%;
+    font-family:'Orbitron',monospace;font-weight:700;border:none;cursor:pointer;transition:all .15s;}
+  .btn-play:hover{background:linear-gradient(90deg,#fff,var(--blue));box-shadow:0 0 36px rgba(0,200,255,.6);}
+  .home-rules{font-size:.6rem;opacity:.35;line-height:1.95;margin-top:22px;}
+  .btn-local{background:rgba(255,34,68,.12);color:var(--red);border:1px solid var(--red);font-family:'Orbitron',monospace;font-size:.65rem;font-weight:700;letter-spacing:.14em;padding:9px 0;width:100%;cursor:pointer;transition:all .15s;margin-top:8px;}
+  .btn-local:hover{background:var(--red);color:#000;}
+
+  /* private room UI */
+  .home-divider{display:flex;align-items:center;gap:10px;margin:14px 0;opacity:.3;font-size:.6rem;letter-spacing:.1em;}
+  .home-divider::before,.home-divider::after{content:'';flex:1;height:1px;background:#1a3a5a;}
+  .btn-private{background:rgba(255,215,0,.1);color:var(--gold);border:1px solid var(--gold);
+    font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;letter-spacing:.14em;
+    padding:11px 0;width:100%;cursor:pointer;transition:all .15s;}
+  .btn-private:hover{background:var(--gold);color:#000;}
+  #room-panel{margin-top:10px;display:none;flex-direction:column;gap:8px;}
+  #room-panel.visible{display:flex;}
+  .room-tabs{display:flex;gap:0;}
+  .rtab{flex:1;padding:8px;font-family:'Orbitron',monospace;font-size:.6rem;letter-spacing:.1em;
+    background:rgba(0,20,40,.6);border:1px solid #1a3a5a;cursor:pointer;transition:all .15s;text-align:center;}
+  .rtab.active{background:rgba(0,200,255,.15);border-color:var(--blue);color:var(--blue);}
+  .rtab:first-child{border-right:none;}
+  #room-create-view,#room-join-view{display:none;flex-direction:column;gap:8px;}
+  #room-create-view.visible,#room-join-view.visible{display:flex;}
+  .code-display{background:rgba(0,200,255,.07);border:1px solid var(--blue);padding:14px;text-align:center;display:none;}
+  .code-display.visible{display:block;}
+  .code-val{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:900;color:var(--blue);
+    letter-spacing:.15em;text-shadow:0 0 12px var(--blue);}
+  .code-link{font-size:.58rem;opacity:.45;margin-top:4px;word-break:break-all;}
+  .copy-btn{font-size:.58rem;background:rgba(0,200,255,.15);color:var(--blue);border:1px solid var(--blue);
+    padding:4px 12px;cursor:pointer;font-family:'Share Tech Mono',monospace;margin-top:6px;}
+  .copy-btn:hover{background:var(--blue);color:#000;}
+  #join-code-input{background:rgba(0,20,40,.8);border:1px solid #1a3a5a;color:#fff;
+    font-family:'Orbitron',monospace;font-size:.95rem;padding:10px 14px;width:100%;
+    text-align:center;outline:none;letter-spacing:.2em;transition:border-color .2s;text-transform:uppercase;}
+  #join-code-input:focus{border-color:var(--blue);box-shadow:0 0 10px rgba(0,200,255,.2);}
+  #join-code-input::placeholder{opacity:.28;font-size:.7rem;letter-spacing:.1em;}
+  #room-error{color:var(--red);font-size:.62rem;min-height:1em;text-align:center;}
+
+</style>
+</head>
+<body>
+<header><h1>◈ CAPTURE THE FLAG — 5v5 ◈</h1></header>
+<div id="hud">
+  <div class="score-block"><span class="score-label">🔵 BLUE</span><span class="score-val blue-val" id="s-blue">0</span></div>
+  <div class="score-block"><span class="score-label">⏱ TIME</span><span class="score-val time-val" id="s-time">5:00</span></div>
+  <div class="score-block"><span class="score-label">🔴 RED</span><span class="score-val red-val"  id="s-red">0</span></div>
+</div>
+<div id="game-area">
+  <canvas id="c"></canvas>
+  <canvas id="minimap" width="160" height="100"></canvas>
+  <div id="my-team-bar" style="display:none"></div>
+</div>
+<div id="home-screen">
+  <div class="hbox">
+    <div class="home-title">◈ CAPTURE THE FLAG ◈</div>
+    <div class="home-tagline">5v5 · MULTI-ROOM · REAL-TIME</div>
+    <input id="nickname-input" type="text" maxlength="16" placeholder="ENTER NICKNAME" autocomplete="off" spellcheck="false" />
+    <div id="nickname-error"></div>
+    <button class="btn-play" onclick="startQuickPlayBots()">▶ QUICK PLAY</button>
+
+    <div class="home-divider">OR</div>
+
+    <button class="btn-private" onclick="toggleRoomPanel()">⚡ PRIVATE ROOM</button>
+
+    <div id="room-panel">
+      <div class="room-tabs">
+        <div class="rtab active" id="tab-create" onclick="switchTab('create')">CREATE</div>
+        <div class="rtab" id="tab-join" onclick="switchTab('join')">JOIN</div>
+      </div>
+
+      <div id="room-create-view" class="visible">
+        <button class="btn-play" style="background:linear-gradient(90deg,#005a8a,#003a5a);font-size:.72rem" onclick="createPrivateRoom()">⚡ CREATE ROOM</button>
+        <div class="code-display" id="code-display">
+          <div style="font-size:.55rem;opacity:.5;letter-spacing:.12em;margin-bottom:6px">YOUR ROOM CODE</div>
+          <div class="code-val" id="code-val"></div>
+          <div class="code-link" id="code-link"></div>
+          <button class="copy-btn" onclick="copyRoomLink()">📋 COPY INVITE LINK</button>
+          <button class="copy-btn" style="color:var(--gold);border-color:var(--gold);margin-top:4px" onclick="enterOwnRoom()">▶ ENTER YOUR ROOM</button>
+        </div>
+      </div>
+
+      <div id="room-join-view">
+        <input id="join-code-input" type="text" maxlength="20" placeholder="ENTER ROOM CODE" autocomplete="off" spellcheck="false">
+        <button class="btn-play" style="font-size:.72rem" onclick="joinPrivateRoom()">→ JOIN ROOM</button>
+      </div>
+
+      <div id="room-error"></div>
+    </div>
+
+    <div class="home-divider" style="margin-top:14px"></div>
+    <button class="btn-local" onclick="location.href='local2p.html'">⌨ LOCAL 2-PLAYER (SAME KEYBOARD)</button>
+    <div class="home-rules">
+      WASD / ARROWS to move &nbsp;·&nbsp; SPACE / F to tag<br>
+      Grab the enemy flag · return it to your base<br>
+      Tag enemies to send them back to spawn<br>
+      First to <b style="color:var(--gold)">5 captures</b> wins
+    </div>
+  </div>
+</div>
+<div id="overlay">
+  <div class="obox" id="obox">
+    <h2 style="color:var(--blue)">CAPTURE THE FLAG</h2>
+    <div id="role-badge" class="rb-spec">CONNECTING…</div>
+    <div id="lobby-info">Waiting for players…</div>
+    <div id="controls">
+      Move: <b>W A S D</b> or <b>Arrow Keys</b> &nbsp;|&nbsp; Tag: <b>Space</b> or <b>F</b><br>
+      Grab the enemy flag and return it to your base.<br>
+      Tag an enemy to send them back to spawn and drop their flag.<br>
+      Dropped flags return home in <b style="color:var(--gold)">5 seconds</b>. First to <b style="color:var(--gold)">5 caps</b> wins!
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════════
+// SOUND ENGINE (Web Audio API — no files needed)
+// ═══════════════════════════════════════════════════════════
+const SFX = (() => {
+  let ctx = null;
+  function getCtx() {
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  function tone(freq, type, vol, attack, decay, startTime) {
+    const ac = getCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(vol, startTime + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + attack + decay);
+    osc.start(startTime);
+    osc.stop(startTime + attack + decay + 0.01);
+  }
+
+  function sweep(freqStart, freqEnd, type, vol, duration, startTime) {
+    const ac = getCtx();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqStart, startTime);
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, startTime + duration);
+    gain.gain.setValueAtTime(vol, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.01);
+  }
+
+  function noise(vol, duration, startTime) {
+    const ac = getCtx();
+    const bufSize = ac.sampleRate * duration;
+    const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random()*2-1);
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const gain = ac.createGain();
+    const filter = ac.createBiquadFilter();
+    filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5;
+    src.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    gain.gain.setValueAtTime(vol, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    src.start(startTime); src.stop(startTime + duration + 0.01);
+  }
+
+  return {
+    flagGrab() {
+      // Rising sweep — exciting!
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(300, 900, 'sine', 0.18, 0.12, t);
+      sweep(450, 1100, 'sine', 0.10, 0.10, t + 0.04);
+      tone(1200, 'sine', 0.12, 0.01, 0.18, t + 0.12);
+    },
+    capture() {
+      // Triumphant 3-note fanfare
+      const ac = getCtx(), t = ac.currentTime;
+      tone(523, 'sine', 0.22, 0.01, 0.12, t);
+      tone(659, 'sine', 0.22, 0.01, 0.12, t + 0.12);
+      tone(784, 'sine', 0.25, 0.01, 0.30, t + 0.24);
+      tone(1047,'sine', 0.20, 0.01, 0.35, t + 0.30);
+      // Harmonic shimmer
+      tone(1568,'sine', 0.08, 0.01, 0.35, t + 0.30);
+    },
+    tagged() {
+      // Thud + zap
+      const ac = getCtx(), t = ac.currentTime;
+      noise(0.25, 0.08, t);
+      sweep(400, 80, 'sawtooth', 0.18, 0.15, t);
+      sweep(800, 120, 'square', 0.08, 0.12, t + 0.02);
+    },
+    flagReturn() {
+      // Soft descending — flag went home
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(600, 300, 'sine', 0.12, 0.20, t);
+      tone(300, 'sine', 0.08, 0.01, 0.15, t + 0.18);
+    },
+    gameStart() {
+      // Dramatic rising sting
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(200, 600, 'sawtooth', 0.10, 0.08, t);
+      tone(440, 'sine', 0.18, 0.01, 0.15, t + 0.08);
+      tone(660, 'sine', 0.18, 0.01, 0.15, t + 0.20);
+      tone(880, 'sine', 0.20, 0.01, 0.25, t + 0.32);
+    },
+    win() {
+      // 5-note victory
+      const ac = getCtx(), t = ac.currentTime;
+      const notes = [523, 659, 784, 659, 1047];
+      const times = [0,   0.13, 0.26, 0.39, 0.52];
+      notes.forEach((f, i) => tone(f, 'sine', 0.22, 0.01, 0.18, t + times[i]));
+    },
+    lose() {
+      // Descending wah-wah
+      const ac = getCtx(), t = ac.currentTime;
+      sweep(440, 220, 'sawtooth', 0.15, 0.20, t);
+      sweep(330, 165, 'sawtooth', 0.12, 0.20, t + 0.22);
+      sweep(220, 110, 'sawtooth', 0.10, 0.25, t + 0.44);
+    },
+    tick() {
+      // Subtle countdown click
+      const ac = getCtx(), t = ac.currentTime;
+      tone(880, 'sine', 0.06, 0.001, 0.04, t);
+    },
+    countdownBeep(final) {
+      // Louder beep for final 3s
+      const ac = getCtx(), t = ac.currentTime;
+      tone(final ? 1200 : 880, 'sine', final ? 0.18 : 0.10, 0.001, 0.08, t);
+    },
+  };
+})();
+
+// track prev flash to detect new events
+let prevFlash = null;
+let prevScoreBlue = 0, prevScoreRed = 0;
+let prevTimeLeft = 9999;
+
+function detectSoundEvents(msg) {
+  if (msg.type === 'phase' && msg.phase === 'playing') {
+    SFX.gameStart();
+  }
+  if (msg.type === 'state') {
+    // Score — capture
+    if (msg.scoreBlue > prevScoreBlue || msg.scoreRed > prevScoreRed) {
+      const isMine = (myTeam === 'blue' && msg.scoreBlue > prevScoreBlue) ||
+                     (myTeam === 'red'  && msg.scoreRed  > prevScoreRed);
+      isMine ? SFX.win() : SFX.capture();
+    }
+    prevScoreBlue = msg.scoreBlue;
+    prevScoreRed  = msg.scoreRed;
+
+    // Flash message changes — detect events
+    if (msg.flash && msg.flash !== prevFlash) {
+      const f = msg.flash;
+      if (f.includes('grabbed')) SFX.flagGrab();
+      else if (f.includes('spawn')) SFX.tagged();
+      else if (f.includes('returned')) SFX.flagReturn();
+      prevFlash = f;
+    }
+
+    // Countdown ticks
+    if (msg.timeLeft !== prevTimeLeft) {
+      if (msg.timeLeft <= 10 && msg.timeLeft > 0) SFX.countdownBeep(msg.timeLeft <= 3);
+      else if (msg.timeLeft <= 30 && msg.timeLeft % 10 === 0) SFX.tick();
+      prevTimeLeft = msg.timeLeft;
+    }
+  }
+  if (msg.type === 'gameover') {
+    const iWin = msg.winner === myTeam;
+    setTimeout(() => iWin ? SFX.win() : SFX.lose(), 300);
+  }
+}
+
+// ── Config (must match server) ─────────────────────────────────────────────────
+const TILE        = 20;
+const PLAYER_SIZE = 18;
+const TAG_RANGE   = 40;
+const TAG_COOLDOWN= 70;
+const FLAG_RETURN = 250;
+const FPS         = 50;
+
+const C = {
+  bg:'#06090f', grid:'#090e18',
+  blue:'#00cfff', blueDark:'#004466', blueGlow:'rgba(0,200,255,.5)',
+  red:'#ff2244',  redDark:'#550011',  redGlow:'rgba(255,34,68,.5)',
+  gold:'#ffd700', wall:'#1a2d40', wallStroke:'#2a4060',
+};
+
+// ── Canvas ─────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const mmCvs  = document.getElementById('minimap');
+const mmCtx  = mmCvs.getContext('2d');
+
+let W = 1600, H = 1000; // updated on init
+
+// Viewport (camera follows my player)
+let camX = 0, camY = 0;
+const VIEW_W = () => Math.min(window.innerWidth  - 16, W);
+const VIEW_H = () => Math.min(window.innerHeight - 80, H);
+
+function resizeCanvas() {
+  canvas.width  = VIEW_W();
+  canvas.height = VIEW_H();
+}
+window.addEventListener('resize', resizeCanvas);
+
+// ── Game state (rendered client-side) ─────────────────────────────────────────
+let myId = null, myTeam = null;
+let walls = [], rects = [], blueBase = {}, redBase = {};
+let blueSpawns = [], redSpawns = [];
+let gamePhase = 'waiting';
+let maxScore = 5;
+
+let state = {
+  players: [],
+  blueFlag: { x:0,y:0, carriedBy:null, home:true, returnTimer:0 },
+  redFlag:  { x:0,y:0, carriedBy:null, home:true, returnTimer:0 },
+  scoreBlue:0, scoreRed:0, timeLeft:300,
+  flash:null, flashTimer:0, tagEffects:[],
+};
+
+// ── Keys ───────────────────────────────────────────────────────────────────────
+const keys = {};
+let lastKeySent = {};
+window.addEventListener('keydown', e => {
+  if ([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+  if ((e.key === ' ' || e.key === 'f' || e.key === 'F') && ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type:'tag' }));
+    SFX.tagged(); // play immediately for responsiveness
+  }
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+function sendKeys() {
+  if (!ws || ws.readyState !== 1 || gamePhase !== 'playing') return;
+  const up    = !!(keys['w'] || keys['W'] || keys['ArrowUp']);
+  const down  = !!(keys['s'] || keys['S'] || keys['ArrowDown']);
+  const left  = !!(keys['a'] || keys['A'] || keys['ArrowLeft']);
+  const right = !!(keys['d'] || keys['D'] || keys['ArrowRight']);
+  if (up!==lastKeySent.up||down!==lastKeySent.down||left!==lastKeySent.left||right!==lastKeySent.right) {
+    ws.send(JSON.stringify({ type:'keys', up, down, left, right }));
+    lastKeySent = { up, down, left, right };
+  }
+}
+setInterval(sendKeys, 1000/FPS);
+
+// ── WebSocket ──────────────────────────────────────────────────────────────────
+let ws;
+let currentRoomId = null;
+let currentRoomCode = null;
+
+function updateWaitCountdown(seconds) {
+  const lobbyEl = document.getElementById('lobby-info');
+  if (!lobbyEl) return;
+  const roomTag = currentRoomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${currentRoomId}</span><br>` : '';
+  if (seconds <= 0) {
+    lobbyEl.innerHTML = roomTag + `<b style="color:var(--gold)">⚡ GAME STARTING…</b>`;
+    return;
+  }
+  const maxSecs = seconds > 10 ? 20 : 3;
+  const bar = Math.round((seconds / maxSecs) * 10);
+  const filled = '█'.repeat(bar) + '░'.repeat(10 - bar);
+  lobbyEl.innerHTML = roomTag +
+    `<b style="color:var(--gold)">⚡ STARTING IN ${seconds}s</b><br>` +
+    `<span style="color:var(--gold);letter-spacing:.05em;font-size:.8rem">${filled}</span><br>` +
+    `<span style="opacity:.55;font-size:.65rem">More players can still join!</span>`;
+}
+
+
+function sendNickname() {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nickname', name: playerNickname }));
+}
+
+function connect(roomCode, quickPlay) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  let wsUrl;
+  if (quickPlay) {
+    wsUrl = `${proto}://${location.host}?quickplay=1`;
+  } else if (roomCode) {
+    wsUrl = `${proto}://${location.host}?room=${encodeURIComponent(roomCode)}`;
+  } else {
+    wsUrl = `${proto}://${location.host}`;
+  }
+  console.log('[CTF] Connecting to:', wsUrl);
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => { console.log('Connected'); if (playerNickname) sendNickname(); };
+
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'init') {
+      document.getElementById('home-screen').style.display = 'none';
+      document.getElementById('overlay').style.display = 'flex';
+      myId = msg.playerId; myTeam = msg.team;
+      W = msg.W; H = msg.H;
+      walls = msg.walls;
+      rects = walls.map(w => ({ x:w.x*TILE, y:w.y*TILE, w:w.w*TILE, h:w.h*TILE }));
+      blueBase = msg.blueBase; redBase = msg.redBase;
+      blueSpawns = msg.blueSpawns; redSpawns = msg.redSpawns;
+      maxScore = msg.maxScore || 5;
+      if (msg.roomId) currentRoomId = msg.roomId;
+      if (msg.roomCode) currentRoomCode = msg.roomCode;
+      resizeCanvas();
+      updateRoleBadge();
+      showTeamBar();
+    }
+
+    if (msg.type === 'spectator') {
+      myTeam = 'spectator';
+      document.getElementById('role-badge').className = 'rb-spec';
+      document.getElementById('role-badge').textContent = '👁 SPECTATOR';
+      document.getElementById('lobby-info').textContent = msg.msg;
+    }
+
+    if (msg.type === 'lobby') {
+      const need = msg.need;
+      const roomCodeTag = currentRoomCode ? `<span style="font-family:'Orbitron',monospace;font-size:.6rem;color:var(--gold);letter-spacing:.1em">${currentRoomCode}</span><br>` : (msg.roomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${msg.roomId}</span><br>` : '');
+      const roomTag = roomCodeTag;
+      document.getElementById('lobby-info').innerHTML =
+        roomTag +
+        `<span class="lb">🔵 Blue: ${msg.blue}/${need}</span> &nbsp; <span class="lr">🔴 Red: ${msg.red}/${need}</span><br>
+         <span style="opacity:.6">Waiting for players on both teams…<br>Max ${need} per team.</span>`;
+    }
+
+    if (msg.type === 'waitStart') {
+      document.getElementById('home-screen').style.display = 'none';
+      document.getElementById('overlay').style.display = 'flex';
+      updateWaitCountdown(msg.seconds);
+    }
+
+    if (msg.type === 'waitTick') {
+      updateWaitCountdown(msg.seconds);
+    }
+
+    if (msg.type === 'error') {
+      // Server sent an error (e.g. room not found)
+      document.getElementById('home-screen').style.display = 'flex';
+      document.getElementById('room-error').textContent = msg.msg;
+      ws.close();
+      return;
+    }
+
+    if (msg.type === 'waitCancelled') {
+      // A player left and we no longer have both teams
+      const lobbyEl = document.getElementById('lobby-info');
+      if (lobbyEl) {
+        const roomTag = currentRoomId ? `<span style="opacity:.35;font-size:.6rem">ROOM #${currentRoomId}</span><br>` : '';
+        lobbyEl.innerHTML = roomTag +
+          `<span style="opacity:.7">⏸ Wait cancelled — need a player on each team.</span>`;
+      }
+    }
+
+    if (msg.type === 'phase' && msg.phase === 'playing') {
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('home-screen').style.display = 'none';
+      gamePhase = 'playing';
+      resizeCanvas();
+    }
+
+    if (msg.type === 'state') {
+      state.players   = msg.players;
+      state.blueFlag  = msg.blueFlag;
+      state.redFlag   = msg.redFlag;
+      state.scoreBlue = msg.scoreBlue;
+      state.scoreRed  = msg.scoreRed;
+      state.timeLeft  = msg.timeLeft;
+      state.flash      = msg.flash;
+      state.flashTimer = msg.flashTimer;
+      state.tagEffects = msg.tagEffects || [];
+      document.getElementById('s-blue').textContent = msg.scoreBlue;
+      document.getElementById('s-red').textContent  = msg.scoreRed;
+      updateTimerEl(msg.timeLeft);
+    }
+
+    if (msg.type === 'gameover') {
+      gamePhase = 'over';
+      showGameOver(msg);
+    }
+
+    if (msg.type === 'playerdisconnected') {
+      gamePhase = 'waiting';
+      document.getElementById('obox').innerHTML = `
+        <h2 style="color:var(--gold)">PLAYER DISCONNECTED</h2>
+        <p>A player left the game. Waiting for players to reconnect.</p>`;
+      document.getElementById('overlay').style.display = 'flex';
+    }
+  };
+
+  ws.onclose = () => {
+    setTimeout(connect, 2000);
+    document.getElementById('obox').innerHTML = `<h2 style="color:#888">DISCONNECTED</h2><p>Reconnecting…</p>`;
+    document.getElementById('overlay').style.display = 'flex';
+  };
+}
+
+
+// ── Private room UI ────────────────────────────────────────────────────────────
+let privateRoomCode = null;
+
+function toggleRoomPanel() {
+  const panel = document.getElementById('room-panel');
+  panel.classList.toggle('visible');
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-create').classList.toggle('active', tab==='create');
+  document.getElementById('tab-join').classList.toggle('active', tab==='join');
+  document.getElementById('room-create-view').classList.toggle('visible', tab==='create');
+  document.getElementById('room-join-view').classList.toggle('visible', tab==='join');
+  document.getElementById('room-error').textContent = '';
+}
+
+async function createPrivateRoom() {
+  document.getElementById('room-error').textContent = '';
+  try {
+    const res = await fetch('/api/rooms/create', { method: 'POST' });
+    const data = await res.json();
+    privateRoomCode = data.code;
+    // Don't set pendingRoomCode here — user must explicitly click Join to enter
+    const display = document.getElementById('code-display');
+    display.classList.add('visible');
+    document.getElementById('code-val').textContent = data.code;
+    const link = window.location.origin + '/?room=' + data.code;
+    document.getElementById('code-link').textContent = link;
+  } catch(e) {
+    document.getElementById('room-error').textContent = 'Failed to create room. Try again.';
+  }
+}
+
+function enterOwnRoom() {
+  if (!privateRoomCode) return;
+  goToNicknameScreen(privateRoomCode);
+}
+
+function copyRoomLink() {
+  if (!privateRoomCode) return;
+  const link = window.location.origin + '/?room=' + privateRoomCode;
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ COPIED!';
+    setTimeout(() => btn.textContent = '📋 COPY INVITE LINK', 2000);
+  });
+}
+
+function joinPrivateRoom() {
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  if (!code) { document.getElementById('room-error').textContent = 'Enter a room code.'; return; }
+  // Store code then go through nickname flow
+  pendingRoomCode = code;
+  goToNicknameScreen(code);
+}
+
+// Read ?room= from URL on page load and auto-populate join field
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('room');
+  if (code) {
+    const urlCode = code.toUpperCase();
+    // Show the join UI pre-filled
+    const panel = document.getElementById('room-panel');
+    panel.classList.add('visible');
+    switchTab('join');
+    document.getElementById('join-code-input').value = urlCode;
+    // Pre-stage the code but don't connect yet — user still needs to enter nickname
+    _pendingCode = urlCode;
+  }
+})();
+
+document.getElementById('join-code-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') joinPrivateRoom();
+});
+
+// ── Home screen ───────────────────────────────────────────────────────────────
+let playerNickname = '';
+
+// Called when joining a private room — stores code, then nickname screen calls connect(code)
+let _pendingCode = null;
+function goToNicknameScreen(code) {
+  _pendingCode = code;
+  // If nickname already entered, connect immediately
+  if (playerNickname) {
+    document.getElementById('home-screen').style.display = 'none';
+    connect(_pendingCode);
+    _pendingCode = null;
+    return;
+  }
+  document.getElementById('home-screen').style.display = 'flex';
+  document.getElementById('nickname-input').focus();
+}
+
+function startMatchmaking() {
+  const input = document.getElementById('nickname-input');
+  const errEl = document.getElementById('nickname-error');
+  const raw = input.value.trim().replace(/\s+/g, ' ');
+  if (!raw) { errEl.textContent = 'Please enter a nickname.'; input.focus(); return; }
+  if (raw.length < 2) { errEl.textContent = 'Too short — at least 2 characters.'; input.focus(); return; }
+  errEl.textContent = '';
+  playerNickname = raw.slice(0, 16);
+  document.getElementById('home-screen').style.display = 'none';
+  const codeToUse = _pendingCode || null; // null = quick play, code = private room
+  _pendingCode = null;
+  connect(codeToUse);
+}
+
+function startQuickPlayBots() {
+  const input = document.getElementById('nickname-input');
+  const errEl = document.getElementById('nickname-error');
+  const raw = (input.value || '').trim();
+  if (!raw) { errEl.textContent = 'Please enter a nickname first.'; input.focus(); return; }
+  if (raw.length < 2) { errEl.textContent = 'Too short — at least 2 characters.'; input.focus(); return; }
+  errEl.textContent = '';
+  playerNickname = raw.slice(0, 16);
+  document.getElementById('home-screen').style.display = 'none';
+  _pendingCode = null;
+  connect(null, true);
+}
+
+// Allow pressing Enter in nickname field
+document.getElementById('nickname-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startMatchmaking();
+});
+
+// Focus the input on load
+document.getElementById('nickname-input').focus();
+
+
+// ── HUD helpers ────────────────────────────────────────────────────────────────
+function updateRoleBadge() {
+  const el = document.getElementById('role-badge');
+  if (myTeam === 'blue') { el.className='rb-blue'; el.textContent='🔵 BLUE TEAM'; }
+  else if (myTeam === 'red') { el.className='rb-red'; el.textContent='🔴 RED TEAM'; }
+  else { el.className='rb-spec'; el.textContent='👁 SPECTATOR'; }
+}
+
+function showTeamBar() {
+  const bar = document.getElementById('my-team-bar');
+  bar.style.display = 'block';
+  const nameTag = playerNickname ? playerNickname + ' · ' : '';
+  if (myTeam === 'blue') { bar.className='mtb-blue'; bar.textContent= nameTag + '🔵 BLUE — WASD · SPACE to tag'; }
+  else if (myTeam === 'red')  { bar.className='mtb-red';  bar.textContent= nameTag + '🔴 RED — WASD · SPACE to tag'; }
+}
+
+function updateTimerEl(s) {
+  const m = Math.floor(s/60), sec = s%60;
+  document.getElementById('s-time').textContent = m+':'+(sec<10?'0':'')+sec;
+  document.getElementById('s-time').style.color = s<=30?'#ff4444':'';
+}
+
+function showGameOver(msg) {
+  const box = document.getElementById('obox');
+  let html = '';
+  if (msg.winner==='draw') {
+    html=`<h2 style="color:var(--gold)">DRAW!</h2><div class="winner-msg" style="color:var(--gold)">🏳 TIE GAME</div>`;
+  } else {
+    const col=msg.winner==='blue'?'var(--blue)':'var(--red)', e=msg.winner==='blue'?'🔵':'🔴';
+    html=`<h2 style="color:${col}">${e} ${msg.winner.toUpperCase()} WINS!</h2>
+          <div class="winner-msg" style="color:${col}">${msg.winner==='blue'?msg.scoreBlue:msg.scoreRed} captures</div>`;
+  }
+  html+=`<p>Final — Blue: ${msg.scoreBlue} · Red: ${msg.scoreRed}</p>`;
+  html+=`<button class="btn btn-blue" onclick="requestRestart()">⚡ PLAY AGAIN</button>`;
+  box.innerHTML = html;
+  document.getElementById('overlay').style.display = 'flex';
+}
+
+function requestRestart() {
+  if (ws && ws.readyState===1) ws.send(JSON.stringify({type:'restart'}));
+}
+
+// ── Camera ─────────────────────────────────────────────────────────────────────
+function updateCamera() {
+  const me = state.players.find(p => p.id === myId);
+  if (!me && state.players.length) {
+    // Spectator — follow action centroid
+    const cx = state.players.reduce((s,p)=>s+p.x,0)/state.players.length;
+    const cy = state.players.reduce((s,p)=>s+p.y,0)/state.players.length;
+    camX = cx - canvas.width/2;
+    camY = cy - canvas.height/2;
+  } else if (me) {
+    camX = me.x - canvas.width/2;
+    camY = me.y - canvas.height/2;
+  }
+  camX = Math.max(0, Math.min(W - canvas.width,  camX));
+  camY = Math.max(0, Math.min(H - canvas.height, camY));
+}
+
+// ── Draw ───────────────────────────────────────────────────────────────────────
+function drawBase(b, color) {
+  const s = TILE * 3;
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.shadowColor = color; ctx.shadowBlur = 14;
+  ctx.strokeRect(b.x-s/2, b.y-s/2, s, s);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = color; ctx.globalAlpha = 0.07;
+  ctx.fillRect(b.x-s/2, b.y-s/2, s, s);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('BASE', b.x, b.y - s/2 - 4);
+}
+
+function drawSpawns(spawns, color) {
+  spawns.forEach(sp => {
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.25; ctx.lineWidth = 1;
+    ctx.strokeRect(sp.x - PLAYER_SIZE/2 - 4, sp.y - PLAYER_SIZE/2 - 4, PLAYER_SIZE+8, PLAYER_SIZE+8);
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawFlag(f, color) {
+  if (!f) return;
+  const pole = 16;
+  ctx.fillStyle = '#bbb';
+  ctx.fillRect(f.x-1, f.y-pole, 2, pole);
+  ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(f.x+1, f.y-pole);
+  ctx.lineTo(f.x+14, f.y-pole+6);
+  ctx.lineTo(f.x+1,  f.y-pole+12);
+  ctx.closePath();
+  ctx.fill(); ctx.shadowBlur = 0;
+
+  if (!f.home && f.returnTimer > 0) {
+    const frac = f.returnTimer / FLAG_RETURN;
+    const secs = Math.ceil(f.returnTimer / FPS);
+    ctx.globalAlpha = 0.15; ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 16, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 16, -Math.PI/2, -Math.PI/2 + frac*Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = color; ctx.font = 'bold 9px Share Tech Mono'; ctx.textAlign = 'center';
+    ctx.fillText(secs+'s', f.x, f.y+4);
+  }
+}
+
+function drawPlayer(p) {
+  const isMe = p.id === myId;
+  const color = p.team === 'blue' ? C.blue : C.red;
+  const dark  = p.team === 'blue' ? C.blueDark : C.redDark;
+  const half  = PLAYER_SIZE / 2;
+
+  // Glow stronger for self
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = isMe ? 18 : 8;
+  ctx.fillStyle   = color;
+  ctx.fillRect(p.x-half, p.y-half, PLAYER_SIZE, PLAYER_SIZE);
+  ctx.shadowBlur  = 0;
+
+  // Inner
+  ctx.fillStyle = dark;
+  ctx.fillRect(p.x-half+3, p.y-half+3, PLAYER_SIZE-6, PLAYER_SIZE-6);
+
+  // "Me" indicator — white ring
+  if (isMe) {
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(p.x-half-2, p.y-half-2, PLAYER_SIZE+4, PLAYER_SIZE+4);
+  }
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(p.x-4, p.y-3, 3, 3);
+  ctx.fillRect(p.x+1, p.y-3, 3, 3);
+
+  // Tag cooldown arc
+  if (p.tagCooldown > 0) {
+    const frac = 1 - p.tagCooldown / TAG_COOLDOWN;
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 2; ctx.globalAlpha = 0.6;
+    ctx.beginPath(); ctx.arc(p.x, p.y, half+5, -Math.PI/2, -Math.PI/2+frac*Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Flag carried
+  if (p.hasFlag) {
+    const fc = p.team === 'blue' ? C.red : C.blue;
+    ctx.fillStyle = fc; ctx.shadowColor = fc; ctx.shadowBlur = 10;
+    ctx.fillRect(p.x-1, p.y-half-14, 2, 14);
+    ctx.beginPath();
+    ctx.moveTo(p.x+1, p.y-half-14);
+    ctx.lineTo(p.x+10, p.y-half-8);
+    ctx.lineTo(p.x+1,  p.y-half-2);
+    ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+  }
+
+  // Player label / nickname
+  const label = p.isBot ? ('\u{1F916}' + (p.name||'Bot')) : (p.name ? p.name : (isMe ? 'YOU' : 'P' + (p.slotIndex != null ? p.slotIndex + 1 : '')));
+  const fontSize = isMe ? 9 : 8;
+  ctx.font = (isMe ? 'bold ' : '') + fontSize + 'px Share Tech Mono';
+  ctx.textAlign = 'center';
+  // Draw a subtle shadow/outline for readability
+  const labelY = p.y - half - (p.hasFlag ? 18 : 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText(label, p.x + 1, labelY + 1);
+  ctx.fillStyle = isMe ? '#ffffff' : (p.team === 'blue' ? '#88eeff' : '#ffaaaa');
+  ctx.fillText(label, p.x, labelY);
+}
+
+function drawTagEffects() {
+  state.tagEffects.forEach(e => {
+    ctx.strokeStyle = e.color; ctx.lineWidth = 2;
+    ctx.globalAlpha = Math.max(0, e.life/40) * 0.7;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawFlash() {
+  if (!state.flash || state.flashTimer <= 0) return;
+  const a = Math.min(1, state.flashTimer/25);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Orbitron, monospace'; ctx.textAlign = 'center';
+  ctx.shadowColor = C.gold; ctx.shadowBlur = 18;
+  ctx.fillText(state.flash, canvas.width/2, 40);
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+}
+
+function draw() {
+  if (!canvas.width || gamePhase === 'waiting') return;
+  updateCamera();
+
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+
+  // Grid
+  ctx.strokeStyle = '#0a1220'; ctx.lineWidth = 0.5;
+  const sx = Math.floor(camX/TILE)*TILE, sy = Math.floor(camY/TILE)*TILE;
+  for (let x=sx; x<camX+canvas.width+TILE;  x+=TILE) { ctx.beginPath(); ctx.moveTo(x,camY); ctx.lineTo(x,camY+canvas.height); ctx.stroke(); }
+  for (let y=sy; y<camY+canvas.height+TILE; y+=TILE) { ctx.beginPath(); ctx.moveTo(camX,y); ctx.lineTo(camX+canvas.width,y); ctx.stroke(); }
+
+  // Walls
+  rects.forEach(w => {
+    ctx.fillStyle = C.wall; ctx.fillRect(w.x,w.y,w.w,w.h);
+    ctx.strokeStyle = C.wallStroke; ctx.lineWidth = 1; ctx.strokeRect(w.x,w.y,w.w,w.h);
+  });
+
+  // Spawns
+  drawSpawns(blueSpawns, C.blue);
+  drawSpawns(redSpawns, C.red);
+
+  // Bases
+  drawBase(blueBase, C.blue);
+  drawBase(redBase,  C.red);
+
+  // Flags
+  drawFlag(state.blueFlag, C.blue);
+  drawFlag(state.redFlag,  C.red);
+
+  // Tag effects
+  drawTagEffects();
+
+  // Tag range hint for my player
+  const me = state.players.find(p=>p.id===myId);
+  if (me) {
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 1; ctx.globalAlpha = 0.12;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.arc(me.x, me.y, TAG_RANGE, 0, Math.PI*2); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+
+  // Players (draw enemies first, then teammates, then self on top)
+  const enemies = state.players.filter(p=>p.team!==myTeam && p.id!==myId);
+  const mates   = state.players.filter(p=>p.team===myTeam && p.id!==myId);
+  const self    = state.players.filter(p=>p.id===myId);
+  [...enemies, ...mates, ...self].forEach(drawPlayer);
+
+  ctx.restore();
+
+  // Flash message (screen-space)
+  drawFlash();
+
+  // Minimap
+  drawMinimap();
+}
+
+// ── Minimap ────────────────────────────────────────────────────────────────────
+function drawMinimap() {
+  const mw = mmCvs.width, mh = mmCvs.height;
+  const sx = mw/W, sy = mh/H;
+  mmCtx.fillStyle = '#04090f'; mmCtx.fillRect(0,0,mw,mh);
+
+  // Walls
+  mmCtx.fillStyle = '#1a2d40';
+  rects.forEach(w => mmCtx.fillRect(w.x*sx, w.y*sy, w.w*sx, w.h*sy));
+
+  // Flags
+  const bf = state.blueFlag, rf = state.redFlag;
+  mmCtx.fillStyle = C.blue; mmCtx.fillRect(bf.x*sx-2, bf.y*sy-2, 4, 4);
+  mmCtx.fillStyle = C.red;  mmCtx.fillRect(rf.x*sx-2, rf.y*sy-2, 4, 4);
+
+  // Players
+  state.players.forEach(p => {
+    mmCtx.fillStyle = p.id===myId ? '#fff' : (p.team==='blue'?C.blue:C.red);
+    mmCtx.fillRect(p.x*sx-2, p.y*sy-2, p.id===myId?5:3, p.id===myId?5:3);
+  });
+
+  // Viewport rect
+  mmCtx.strokeStyle = 'rgba(255,255,255,0.3)'; mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(camX*sx, camY*sy, canvas.width*sx, canvas.height*sy);
+}
+
+// ── Loop ───────────────────────────────────────────────────────────────────────
+resizeCanvas();
+setInterval(draw, 1000/FPS);
+</script>
+</body>
+</html>
