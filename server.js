@@ -96,6 +96,7 @@ function makeCode() {
 }
 
 const roomsByCode = new Map(); // code -> room
+const publicRooms = new Set();  // only non-private room IDs
 
 function createPrivateRoom() {
   let code;
@@ -392,8 +393,10 @@ function endGame(room, winner) {
 // ── Room assignment ────────────────────────────────────────────────────────────
 // Find a waiting room that has space, or create a new one
 function findOrCreateRoom() {
-  for (const [id, room] of rooms) {
-    if (!room.isPrivate &&
+  // Only iterate public rooms — private rooms are never in this set
+  for (const id of publicRooms) {
+    const room = rooms.get(id);
+    if (room &&
         room.game.phase === 'waiting' &&
         countTeam(room, 'blue') < TEAM_SIZE &&
         countTeam(room, 'red') < TEAM_SIZE) {
@@ -405,6 +408,7 @@ function findOrCreateRoom() {
   const room = makeRoom(id);
   room.game = makeGame();
   rooms.set(id, room);
+  publicRooms.add(id);
   console.log(`Created room ${id}`);
   return room;
 }
@@ -416,6 +420,7 @@ function cleanupRoom(room) {
     if (room.startTimer)     clearTimeout(room.startTimer);
     if (room.startCountdown) clearInterval(room.startCountdown);
     rooms.delete(room.id);
+    publicRooms.delete(room.id);
     if (room.code) roomsByCode.delete(room.code);
     console.log(`Removed empty room ${room.id}`);
   }

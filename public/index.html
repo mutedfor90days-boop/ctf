@@ -450,11 +450,12 @@ function sendNickname() {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'nickname', name: playerNickname }));
 }
 
-function connect() {
+function connect(roomCode) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = pendingRoomCode
-    ? `${proto}://${location.host}?room=${encodeURIComponent(pendingRoomCode)}`
+  const wsUrl = roomCode
+    ? `${proto}://${location.host}?room=${encodeURIComponent(roomCode)}`
     : `${proto}://${location.host}`;
+  console.log('[CTF] Connecting to:', wsUrl);
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => { console.log('Connected'); if (playerNickname) sendNickname(); };
@@ -565,7 +566,6 @@ function connect() {
 
 // ── Private room UI ────────────────────────────────────────────────────────────
 let privateRoomCode = null;
-let pendingRoomCode = null; // code to join when matchmaking starts
 
 function toggleRoomPanel() {
   const panel = document.getElementById('room-panel');
@@ -599,8 +599,7 @@ async function createPrivateRoom() {
 
 function enterOwnRoom() {
   if (!privateRoomCode) return;
-  pendingRoomCode = privateRoomCode;
-  startMatchmaking();
+  goToNicknameScreen(privateRoomCode);
 }
 
 function copyRoomLink() {
@@ -616,8 +615,9 @@ function copyRoomLink() {
 function joinPrivateRoom() {
   const code = document.getElementById('join-code-input').value.trim().toUpperCase();
   if (!code) { document.getElementById('room-error').textContent = 'Enter a room code.'; return; }
+  // Store code then go through nickname flow
   pendingRoomCode = code;
-  startMatchmaking();
+  goToNicknameScreen(code);
 }
 
 // Read ?room= from URL on page load and auto-populate join field
@@ -625,12 +625,14 @@ function joinPrivateRoom() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('room');
   if (code) {
-    pendingRoomCode = code.toUpperCase();
+    const urlCode = code.toUpperCase();
     // Show the join UI pre-filled
     const panel = document.getElementById('room-panel');
     panel.classList.add('visible');
     switchTab('join');
-    document.getElementById('join-code-input').value = pendingRoomCode;
+    document.getElementById('join-code-input').value = urlCode;
+    // Pre-stage the code but don't connect yet — user still needs to enter nickname
+    _pendingCode = urlCode;
   }
 })();
 
@@ -641,6 +643,21 @@ document.getElementById('join-code-input').addEventListener('keydown', e => {
 // ── Home screen ───────────────────────────────────────────────────────────────
 let playerNickname = '';
 
+// Called when joining a private room — stores code, then nickname screen calls connect(code)
+let _pendingCode = null;
+function goToNicknameScreen(code) {
+  _pendingCode = code;
+  // If nickname already entered, connect immediately
+  if (playerNickname) {
+    document.getElementById('home-screen').style.display = 'none';
+    connect(_pendingCode);
+    _pendingCode = null;
+    return;
+  }
+  document.getElementById('home-screen').style.display = 'flex';
+  document.getElementById('nickname-input').focus();
+}
+
 function startMatchmaking() {
   const input = document.getElementById('nickname-input');
   const errEl = document.getElementById('nickname-error');
@@ -649,9 +666,10 @@ function startMatchmaking() {
   if (raw.length < 2) { errEl.textContent = 'Too short — at least 2 characters.'; input.focus(); return; }
   errEl.textContent = '';
   playerNickname = raw.slice(0, 16);
-  pendingRoomCode = null; // Quick Play — don't join a private room
   document.getElementById('home-screen').style.display = 'none';
-  connect();
+  const codeToUse = _pendingCode || null; // null = quick play, code = private room
+  _pendingCode = null;
+  connect(codeToUse);
 }
 
 // Allow pressing Enter in nickname field
