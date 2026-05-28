@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHASE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Barlow+Condensed:wght@400;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #ff3c3c;
+    --gold: #ffd700;
+    --text: #e8e8f0;
+    --muted: #666680;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Lobby ── */
+  #lobby {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    z-index: 100;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .lobby-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 48px 56px;
+    width: 420px;
+    position: relative;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  }
+
+  .lobby-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,60,60,0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .game-logo {
+    font-family: 'Black Ops One', cursive;
+    font-size: 64px;
+    letter-spacing: 8px;
+    color: var(--accent);
+    text-shadow: 0 0 40px rgba(255,60,60,0.6), 0 0 80px rgba(255,60,60,0.2);
+    line-height: 1;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+
+  .game-tagline {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  .rules {
+    background: rgba(255,60,60,0.06);
+    border-left: 2px solid var(--accent);
+    padding: 16px 20px;
+    margin-bottom: 36px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #aaa;
+  }
+  .rules strong { color: var(--accent); }
+
+  label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-top-color: #2e2e3e;
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    padding: 14px 16px;
+    outline: none;
+    transition: border-color .2s;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  button#joinBtn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-family: 'Black Ops One', cursive;
+    font-size: 22px;
+    letter-spacing: 4px;
+    padding: 18px;
+    cursor: pointer;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    transition: opacity .15s, transform .1s;
+  }
+  button#joinBtn:hover { opacity: .9; transform: translateY(-1px); }
+  button#joinBtn:active { transform: translateY(1px); }
+
+  .controls-hint {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    z-index: 50;
+    pointer-events: none;
+  }
+
+  #hud-left { display: flex; align-items: center; gap: 24px; }
+
+  .hud-logo {
+    font-family: 'Black Ops One', cursive;
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: 4px;
+  }
+
+  #my-score-wrap {
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .score-label { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  #my-score { font-family: 'Black Ops One', cursive; font-size: 28px; color: var(--gold); }
+
+  #marked-banner {
+    font-family: 'Black Ops One', cursive;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(255,60,60,0.8);
+    animation: pulse 0.8s ease-in-out infinite alternate;
+    display: none;
+  }
+  @keyframes pulse { from { opacity: .7; } to { opacity: 1; } }
+
+  /* Leaderboard */
+  #leaderboard {
+    position: fixed; top: 72px; right: 16px;
+    background: rgba(10,10,15,0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    min-width: 200px;
+    z-index: 50;
+    pointer-events: none;
+  }
+  .lb-title {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .lb-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 15px; font-weight: 600;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    gap: 16px;
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-pts { font-family: 'Black Ops One', cursive; color: var(--gold); }
+  .lb-marked-tag { font-size: 10px; color: var(--accent); letter-spacing: 1px; }
+
+  /* Toast notification */
+  #toast {
+    position: fixed; bottom: 40px; left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(255,60,60,0.15);
+    border: 1px solid rgba(255,60,60,0.4);
+    backdrop-filter: blur(12px);
+    color: #fff;
+    font-family: 'Black Ops One', cursive;
+    font-size: 18px;
+    letter-spacing: 2px;
+    padding: 14px 32px;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s, transform .3s;
+    white-space: nowrap;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Canvas wrapper */
+  #game-wrap {
+    position: fixed; inset: 0;
+    display: none;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  /* Mobile dpad */
+  #dpad {
+    display: none;
+    position: fixed; bottom: 24px; left: 24px;
+    z-index: 60;
+  }
+  @media (pointer: coarse) {
+    #dpad { display: grid; }
+  }
+  #dpad {
+    grid-template-columns: 52px 52px 52px;
+    grid-template-rows: 52px 52px 52px;
+    gap: 4px;
+  }
+  .dpad-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    active-color: rgba(255,60,60,0.3);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  .dpad-btn:active { background: rgba(255,60,60,0.25); }
+  #dpad-up    { grid-column: 2; grid-row: 1; }
+  #dpad-left  { grid-column: 1; grid-row: 2; }
+  #dpad-right { grid-column: 3; grid-row: 2; }
+  #dpad-down  { grid-column: 2; grid-row: 3; }
+</style>
+</head>
+<body>
+
+<!-- Lobby -->
+<div id="lobby">
+  <div class="lobby-card">
+    <div class="game-logo">CHASE</div>
+    <div class="game-tagline">Kill the marked. Become the hunted.</div>
+    <div class="rules">
+      <strong>⚡ ONE PLAYER IS MARKED.</strong><br>
+      Everyone can see them.<br>
+      <strong>Kill them → you become marked.</strong><br>
+      Being marked = constant points + speed boost.<br>
+      But now… <strong>everyone hunts you.</strong>
+    </div>
+    <label for="nameInput">Your Name</label>
+    <input type="text" id="nameInput" maxlength="16" placeholder="Enter name…" autocomplete="off">
+    <button id="joinBtn">JOIN THE HUNT</button>
+    <div class="controls-hint">WASD / Arrow Keys to move</div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" style="display:none">
+  <div id="hud-left">
+    <div class="hud-logo">CHASE</div>
+    <div id="my-score-wrap">
+      <span class="score-label">Score</span>
+      <span id="my-score">0</span>
+    </div>
+    <div id="marked-banner">⚡ YOU ARE MARKED</div>
+  </div>
+  <div id="player-count" style="font-size:13px;color:var(--muted);letter-spacing:1px;"></div>
+</div>
+
+<div id="leaderboard" style="display:none">
+  <div class="lb-title">Leaderboard</div>
+  <div id="lb-list"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Game Canvas -->
+<div id="game-wrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<!-- Mobile D-Pad -->
+<div id="dpad">
+  <div class="dpad-btn" id="dpad-up">▲</div>
+  <div class="dpad-btn" id="dpad-left">◀</div>
+  <div class="dpad-btn" id="dpad-right">▶</div>
+  <div class="dpad-btn" id="dpad-down">▼</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── Socket & State ──────────────────────────────────────────────
+const socket = io();
+let myId = null;
+let world = { width: 2400, height: 1800 };
+let obstacles = [];
+let playerRadius = 18;
+let gameState = null;
+let camera = { x: 0, y: 0 };
+
+// Input
+const keys = { up: false, down: false, left: false, right: false };
+let lastSentInput = {};
+
+// Canvas
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// ── Assets / Visuals ────────────────────────────────────────────
+const MARKED_GLOW_COLOR = 'rgba(255, 60, 60, 0.55)';
+const MARKED_RING_COLOR  = '#ff3c3c';
+const GROUND_COLOR       = '#0e0e16';
+const GRID_COLOR         = 'rgba(255,255,255,0.025)';
+const OBS_COLOR          = '#1a1a28';
+const OBS_EDGE           = '#2a2a3e';
+
+// ── Lobby submit ────────────────────────────────────────────────
+const lobby    = document.getElementById('lobby');
+const gameWrap = document.getElementById('game-wrap');
+const hud      = document.getElementById('hud');
+const lbEl     = document.getElementById('leaderboard');
+
+document.getElementById('joinBtn').addEventListener('click', join);
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') join();
+});
+
+function join() {
+  const name = document.getElementById('nameInput').value.trim() || 'Player';
+  socket.emit('join', { name });
+  lobby.style.display = 'none';
+  gameWrap.style.display = 'block';
+  hud.style.display = 'flex';
+  lbEl.style.display = 'block';
+  resizeCanvas();
+}
+
+// ── Socket events ───────────────────────────────────────────────
+socket.on('init', data => {
+  myId      = data.id;
+  world     = data.world;
+  obstacles = data.obstacles;
+  playerRadius = data.playerRadius;
+});
+
+socket.on('state', state => {
+  gameState = state;
+  updateHUD(state);
+  render(state);
+});
+
+socket.on('markStolen', ({ by, from, byName }) => {
+  if (by === myId) {
+    showToast('⚡ YOU STOLE THE MARK! +150');
+  } else {
+    showToast(`${byName} stole the mark!`);
+  }
+});
+
+socket.on('newMark', ({ id }) => {
+  if (id === myId) showToast('⚡ YOU ARE NOW MARKED!');
+});
+
+// ── Input ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if      (['ArrowUp',   'w', 'W'].includes(e.key)) keys.up    = true;
+  else if (['ArrowDown', 's', 'S'].includes(e.key)) keys.down  = true;
+  else if (['ArrowLeft', 'a', 'A'].includes(e.key)) keys.left  = true;
+  else if (['ArrowRight','d', 'D'].includes(e.key)) keys.right = true;
+});
+document.addEventListener('keyup', e => {
+  if      (['ArrowUp',   'w', 'W'].includes(e.key)) keys.up    = false;
+  else if (['ArrowDown', 's', 'S'].includes(e.key)) keys.down  = false;
+  else if (['ArrowLeft', 'a', 'A'].includes(e.key)) keys.left  = false;
+  else if (['ArrowRight','d', 'D'].includes(e.key)) keys.right = false;
+});
+
+// Mobile dpad
+function bindDpad(id, dir) {
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); keys[dir] = true; });
+  el.addEventListener('pointerup',   e => { e.preventDefault(); keys[dir] = false; });
+  el.addEventListener('pointerleave',e => { keys[dir] = false; });
+}
+bindDpad('dpad-up',    'up');
+bindDpad('dpad-down',  'down');
+bindDpad('dpad-left',  'left');
+bindDpad('dpad-right', 'right');
+
+// Send input ~60fps
+setInterval(() => {
+  const inp = { up: keys.up, down: keys.down, left: keys.left, right: keys.right };
+  if (JSON.stringify(inp) !== JSON.stringify(lastSentInput)) {
+    socket.emit('input', inp);
+    lastSentInput = { ...inp };
+  }
+}, 1000 / 60);
+
+// ── Resize ──────────────────────────────────────────────────────
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ── Camera ──────────────────────────────────────────────────────
+function updateCamera(me) {
+  if (!me) return;
+  camera.x = me.x - canvas.width  / 2;
+  camera.y = me.y - canvas.height / 2;
+  camera.x = Math.max(0, Math.min(world.width  - canvas.width,  camera.x));
+  camera.y = Math.max(0, Math.min(world.height - canvas.height, camera.y));
+}
+
+// ── Render ──────────────────────────────────────────────────────
+// particle system for marked player trail
+const particles = [];
+
+function spawnParticle(x, y) {
+  particles.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 60,
+    vy: (Math.random() - 0.5) * 60 - 30,
+    life: 1,
+    size: 3 + Math.random() * 4,
+  });
+}
+
+let lastRender = performance.now();
+
+function render(state) {
+  const now = performance.now();
+  const dt  = (now - lastRender) / 1000;
+  lastRender = now;
+
+  const me = state.players.find(p => p.id === myId);
+  updateCamera(me);
+
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
+
+  // Ground
+  ctx.fillStyle = GROUND_COLOR;
+  ctx.fillRect(0, 0, world.width, world.height);
+
+  // Grid
+  ctx.strokeStyle = GRID_COLOR;
+  ctx.lineWidth = 1;
+  const GRID = 80;
+  for (let x = 0; x <= world.width; x += GRID) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, world.height); ctx.stroke();
+  }
+  for (let y = 0; y <= world.height; y += GRID) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(world.width, y); ctx.stroke();
+  }
+
+  // World border glow
+  ctx.strokeStyle = 'rgba(255,60,60,0.25)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, world.width - 4, world.height - 4);
+
+  // Obstacles
+  for (const o of obstacles) {
+    ctx.fillStyle = OBS_COLOR;
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.strokeStyle = OBS_EDGE;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(o.x, o.y, o.w, o.h);
+    // top highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    ctx.fillRect(o.x, o.y, o.w, 4);
+  }
+
+  // Particles (marked trail)
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt * 2.5;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life * 0.6;
+    ctx.fillStyle = '#ff3c3c';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Players
+  for (const p of state.players) {
+    const isMe     = p.id === myId;
+    const isMarked = p.isMarked;
+
+    if (isMarked) {
+      // Spawn particles behind marked player
+      if (Math.random() < 0.4) spawnParticle(p.x, p.y);
+
+      // Outer glow
+      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, playerRadius * 3.5);
+      grad.addColorStop(0, 'rgba(255,60,60,0.35)');
+      grad.addColorStop(1, 'rgba(255,60,60,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, playerRadius * 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pulsing ring
+      const ringR = playerRadius * 2 + Math.sin(Date.now() / 200) * 4;
+      ctx.strokeStyle = MARKED_RING_COLOR;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 200) * 0.3;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + playerRadius * 0.8, playerRadius * 0.9, playerRadius * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = p.color;
+    if (isMe) {
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 18;
+    }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, playerRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Rim
+    ctx.strokeStyle = isMe ? '#fff' : 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = isMe ? 2.5 : 1.5;
+    ctx.stroke();
+
+    // Mark icon
+    if (isMarked) {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${playerRadius}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⚡', p.x, p.y);
+    }
+
+    // Name tag
+    ctx.fillStyle = isMarked ? '#ff3c3c' : (isMe ? '#fff' : 'rgba(255,255,255,0.75)');
+    ctx.font = `${isMe ? 'bold ' : ''}13px 'Barlow Condensed', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(p.name, p.x, p.y - playerRadius - 5);
+
+    // Score above name
+    ctx.fillStyle = isMarked ? '#ffd700' : 'rgba(255,255,255,0.4)';
+    ctx.font = `11px 'Barlow Condensed', sans-serif`;
+    ctx.fillText(p.score, p.x, p.y - playerRadius - 18);
+  }
+
+  ctx.restore();
+}
+
+// ── HUD update ──────────────────────────────────────────────────
+function updateHUD(state) {
+  const me = state.players.find(p => p.id === myId);
+  if (me) {
+    document.getElementById('my-score').textContent = me.score;
+    const banner = document.getElementById('marked-banner');
+    banner.style.display = me.isMarked ? 'block' : 'none';
+  }
+
+  document.getElementById('player-count').textContent =
+    `${state.players.length} PLAYER${state.players.length !== 1 ? 'S' : ''}`;
+
+  // Leaderboard
+  const sorted = [...state.players].sort((a, b) => b.score - a.score).slice(0, 8);
+  document.getElementById('lb-list').innerHTML = sorted.map((p, i) => `
+    <div class="lb-row">
+      <span class="lb-name" style="color:${p.color}">${i === 0 ? '👑 ' : ''}${p.name}${p.isMarked ? ' ⚡' : ''}</span>
+      <span class="lb-pts">${p.score}</span>
+    </div>
+  `).join('');
+}
+
+// ── Toast ───────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// Keep rendering even if no state update (for particle animation)
+function animLoop() {
+  if (gameState) render(gameState);
+  requestAnimationFrame(animLoop);
+}
+animLoop();
+</script>
+</body>
+</html>

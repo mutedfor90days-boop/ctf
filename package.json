@@ -1,17 +1,4 @@
-{
-  "name": "capture-the-flag",
-  "version": "1.0.0",
-  "description": "Online 5v5 Capture the Flag game",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "build": "npm install"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "ws": "^8.16.0"
-  }
-}
+node_modules/
+.env
+.DS_Store
+*.log
